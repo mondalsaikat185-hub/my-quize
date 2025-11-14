@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Competitive Exam MCQ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="quiz-container">
+        <h1>Today's Questions</h1>
+	<div style="margin-bottom: 20px;">
+        <label for="studentName">শিক্ষার্থীর নাম:</label>
+        <input type="text" id="studentName" placeholder="আপনার নাম লিখুন" required style="padding: 8px; width: 98%;">
+    </div>
+        <div id="quiz-area">
+            </div>
+        <button id="submit-btn" onclick="submitQuiz()">কুইজ জমা দিন</button>
+        <div id="results" class="hidden">
+            <h2>ফলাফল</h2>
+            <p id="score-text"></p>
+            <button id="review-btn" onclick="showReview()">ভুল উত্তরগুলি দেখুন</button>
+        </div>
+        <div id="review-area" class="hidden">
+            </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
