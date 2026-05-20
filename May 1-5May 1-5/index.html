@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bilingual GK Quiz</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+:root {
+  /* 2.B. Background Strategy */
+  --bg-main: #e8f5e9;       /* Light Green (Main Page Background) */
+  --bg-paper: #fffde7;      /* Light Yellow (Question Paper Area) */
+  --bg-filler: #fff3e0;     /* Light Peach (Empty/Filler Spaces) */
+  
+  --text-color: #000000;    /* Black Typography */
+  --accent-color: #2e7d32;  /* Dark Green for headers/buttons */
+
+  /* 2.B. Option Styling */
+  --opt-default-bg: #fce4ec;   /* Pink background */
+  --opt-border: #f8bbd0;       /* Pink border */
+  --opt-selected-bg: #d32f2f;  /* Red background (Selected State) */
+  --opt-selected-text: #ffffff; /* White text on Red */
+  
+  --timer-color: #c62828;   /* Red for timer */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-main); /* Light Green Background */
+  color: var(--text-color);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+.main-wrapper {
+  width: 100%;
+  max-width: 800px;
+  background-color: var(--bg-filler); /* Light Peach Filler/Frame */
+  min-height: 100vh;
+  box-shadow: 0 0 20px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  display: none;
+  padding: 20px;
+  width: 100%;
+}
+.screen.active { display: block; }
+
+/* General Cards (Landing & Result) */
+.card {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  text-align: center;
+  margin-top: 40px;
+}
+
+h1 { color: var(--accent-color); margin-bottom: 5px; }
+.subtitle { color: #555; margin-bottom: 25px; }
+
+/* Sticky Header with Timer & Language Toggle */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--bg-main);
+  padding: 10px 20px;
+  border-bottom: 2px solid var(--accent-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin: 0 -20px 20px -20px;
+}
+
+.timer-box {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--timer-color);
+  background: rgba(255,255,255,0.8);
+  padding: 5px 15px;
+  border-radius: 20px;
+}
+
+/* Question Paper Area */
+.question-container {
+  background-color: var(--bg-paper); /* Light Yellow Paper */
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #fae7b5;
+  margin-bottom: 20px;
+}
+
+.question-text {
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+  color: var(--text-color); /* Black text */
+  white-space: pre-wrap; /* Preserves A. B. C. D. line breaks */
+}
+
+/* Options Styling */
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr; 
+  gap: 10px;
+}
+
+.option {
+  padding: 12px 15px;
+  border-radius: 6px;
+  background-color: var(--opt-default-bg); /* Pink */
+  border: 1px solid var(--opt-border); /* Pink border */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.option:hover {
+  filter: brightness(0.95);
+}
+
+/* Selected State: Red Background */
+.option.selected {
+  background-color: var(--opt-selected-bg); /* Red */
+  color: var(--opt-selected-text); /* White text */
+  border-color: #b71c1c;
+}
+
+/* Buttons */
+button {
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.2s;
+}
+button:hover { background-color: #1b5e20; }
+
+/* Review Section */
+.review-item {
+  background: white;
+  border-bottom: 1px solid #eee;
+  padding: 15px;
+  text-align: left;
+}
+.status-correct { color: green; font-weight: bold; }
+.status-wrong { color: #d32f2f; font-weight: bold; }
+.status-unanswered { color: #f57c00; font-weight: bold; }
+.explanation {
+  background: #f1f8e9;
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #333;
+}
+
+@media (min-width: 600px) {
+  .options-grid { grid-template-columns: 1fr 1fr; }
+}
+
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+// =========================================
+// 1. CONFIGURATION
+// =========================================
+const APP_TITLE = "Bilingual GK Quiz";
+const APP_SUBTITLE = "Select language and test your knowledge";
+const DEFAULT_CONFIG = {"totalTime": 600, "marksCorrect": 2.0, "marksWrong": -0.5, "maxQuestions": 0};
+const DEFAULT_LANGUAGE = 'en';
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4OuRL-wnpvEtZPUcO61v6IIWpHcffUdVbMSteEZoVBU9SJn8niXq-yo7bAY785TBp/exec";
+const DEFAULT_RAW_TEXT = "";
+
+window.__PREPARSED_JSON__ = [
+  {
+    "id": 1,
+    "question_bn": "ভারতের সিকিউরিটিজ অ্যান্ড এক্সচেঞ্জ বোর্ড (SEBI) দ্বারা সম্প্রতি প্রবর্তিত 'PaRRVA' ব্যবস্থার মূল উদ্দেশ্য কী?",
+    "options_bn": [
+      "মিউচুয়াল ফান্ড বিনিয়োগকারীদের জন্য একটি নতুন কর কাঠামো প্রদান করা",
+      "বিনিয়োগ উপদেষ্টা, গবেষণা বিশ্লেষক এবং অ্যালগরিদমিক ট্রেডিং ব্রোকারদের ঐতিহাসিক রিটার্নের দাবি স্বাধীনভাবে যাচাই করা",
+      "বিদেশী পোর্টফোলিও বিনিয়োগকারীদের (FPI) জন্য কেওয়াইসি (KYC) প্রক্রিয়া সহজতর করা",
+      "ভারতীয় স্টক এক্সচেঞ্জগুলিতে তালিকাভুক্ত সমস্ত কোম্পানির কর্পোরেট গভর্নেন্স নিরীক্ষণ করা"
+    ],
+    "explanation_bn": "সেবি (SEBI) আর্থিক বাজারে স্বচ্ছতা ও বিনিয়োগকারীদের সুরক্ষা বাড়াতে 'PaRRVA' (Past Risk and Return Verification Agency) চালু করেছে। এই ব্যবস্থাটি বিনিয়োগ উপদেষ্টা, গবেষণা বিশ্লেষক এবং অ্যালগরিদমিক ট্রেডিং প্রদানকারী স্টকব্রোকারদের দ্বারা দাবি করা ঐতিহাসিক রিটার্ন বা কর্মক্ষমতার সত্যতা স্বাধীনভাবে যাচাই করে, যাতে বিনিয়োগকারীরা বিভ্রান্ত না হন।",
+    "question_en": "What is the primary objective of the 'PaRRVA' system recently operationalised by the Securities and Exchange Board of India (SEBI)?",
+    "options_en": [
+      "To provide a new tax framework for mutual fund investors",
+      "To independently verify the historical return claims made by investment advisers, research analysts, and algorithmic trading brokers",
+      "To simplify the KYC process for Foreign Portfolio Investors (FPIs)",
+      "To monitor the corporate governance of all companies listed on Indian stock exchanges"
+    ],
+    "explanation_en": "SEBI operationalised 'PaRRVA' (Past Risk and Return Verification Agency) to enhance transparency and investor protection in financial markets. It independently verifies the historical returns claimed by investment advisers, research analysts, and stockbrokers offering algorithmic trading, ensuring investors are not misled by exaggerated claims.",
+    "correctIndex": 1
+  },
+  {
+    "id": 2,
+    "question_bn": "'PaRRVA' ব্যবস্থার কাঠামোগত পরিচালনা সম্পর্কে নিচের কোন তথ্যটি সঠিক?",
+    "options_bn": [
+      "একটি স্বীকৃত স্টক এক্সচেঞ্জ যাচাইকারী হিসেবে কাজ করে এবং একটি ক্রেডিট রেটিং এজেন্সি ডেটা সেন্টার হিসেবে কাজ করে",
+      "সেবি (SEBI) নিজেই ডেটা সেন্টার এবং যাচাইকারী উভয় হিসেবে সরাসরি কাজ করে",
+      "একটি স্বীকৃত স্টক এক্সচেঞ্জ 'PaRRVA ডেটা সেন্টার' (PDC) হিসেবে এবং একটি সেবি-নিবন্ধিত ক্রেডিট রেটিং এজেন্সি 'যাচাইকারী' হিসেবে কাজ করে",
+      "এটি একটি একক-এজেন্সি কাঠামো যা সম্পূর্ণরূপে ভারতীয় রিজার্ভ ব্যাংক (RBI) দ্বারা নিয়ন্ত্রিত হয়"
+    ],
+    "explanation_bn": "সেবি-র কাঠামো অনুযায়ী, PaRRVA একটি দ্বি-এজেন্সি কাঠামো ব্যবহার করে কাজ করে। এর অধীনে, একটি স্বীকৃত স্টক এক্সচেঞ্জ (যেমন- National Stock Exchange) 'PaRRVA ডেটা সেন্টার' (PDC) হিসেবে কাজ করে এবং একটি সেবি-নিবন্ধিত ক্রেডিট রেটিং এজেন্সি (যেমন- CARE Ratings) কর্মক্ষমতার দাবিগুলি যাচাই করার জন্য 'যাচাইকারী' হিসেবে কাজ করে।",
+    "question_en": "Which of the following is correct regarding the operational structure of the 'PaRRVA' system?",
+    "options_en": [
+      "A recognised stock exchange acts as the verifier and a credit rating agency acts as the data centre",
+      "SEBI itself directly acts as both the data centre and the verifier",
+      "A recognised stock exchange acts as the PaRRVA Data Centre (PDC) and a SEBI-registered credit rating agency acts as the verifier",
+      "It is a single-agency structure managed entirely by the Reserve Bank of India (RBI)"
+    ],
+    "explanation_en": "According to SEBI's framework, PaRRVA uses a two-agency structure to ensure independent and unbiased checking. A recognised stock exchange (like the National Stock Exchange of India) acts as the PaRRVA Data Centre (PDC), while a SEBI-registered credit rating agency (like CARE Ratings Limited) acts as the verifier.",
+    "correctIndex": 2
+  },
+  {
+    "id": 3,
+    "question_bn": "ভারত সরকার কর্তৃক ঘোষিত স্বয়ংক্রিয় রুটের (Automatic Route) অধীনে ভারতের বীমা খাতে সংশোধিত এফডিআই (FDI) সীমার ক্ষেত্রে নিচের কোন শর্তটি প্রযোজ্য?",
+    "options_bn": [
+      "কোনো শর্ত ছাড়াই 100% বিদেশী মালিকানার অনুমতি দেওয়া হয়েছে এবং কোনো ভারতীয় নাগরিকের উপস্থিতির প্রয়োজন নেই",
+      "100% এফডিআই অনুমোদিত, তবে কোম্পানির বোর্ডের চেয়ারম্যান, ম্যানেজিং ডিরেক্টর (MD) এবং সিইও (CEO)-এর মধ্যে অন্তত একজনকে একজন বাসিন্দা ভারতীয় নাগরিক হতে হবে",
+      "এলআইসি (LIC) এবং সমস্ত বীমা মধ্যস্থতাকারী সহ সমগ্র খাতের জন্য এফডিআই সীমা বাড়িয়ে 100% করা হয়েছে",
+      "সর্বোচ্চ এফডিআই সীমা কেবল 74% পর্যন্ত সীমাবদ্ধ রাখা হয়েছে এবং বাকি অংশ সরকারের মালিকানাধীন থাকবে"
+    ],
+    "explanation_bn": "'সবকা বিমা সবকি রক্ষা বিল, 2023' পাসের পর সরকার স্বয়ংক্রিয় রুটের অধীনে বীমা খাতে 100% এফডিআই (FDI) অনুমোদন করেছে। তবে শর্ত হলো, এই ধরনের বিদেশী বিনিয়োগ থাকা ভারতীয় বীমা কোম্পানির বোর্ডের চেয়ারম্যান, ম্যানেজিং ডিরেক্টর (MD) অথবা চিফ এক্সিকিউটিভ অফিসার (CEO)-এর মধ্যে অন্তত একজনকে অবশ্যই বাসিন্দা ভারতীয় নাগরিক হতে হবে।",
+    "question_en": "Under the revised rules notifying 100% FDI in the insurance sector under the automatic route, which of the following conditions must be met by an Indian insurance company?",
+    "options_en": [
+      "100% foreign ownership is allowed unconditionally without requiring any Indian citizen in the management",
+      "At least one among the Chairperson of its board, its Managing Director, and its Chief Executive Officer must be a resident Indian citizen",
+      "The FDI limit has been raised to 100% for the entire sector including LIC and all insurance intermediaries without distinctions",
+      "The maximum foreign investment is capped at 74% with the remaining strictly held by the government"
+    ],
+    "explanation_en": "Following the passage of the Sabka Bima Sabki Raksha Bill, 2025, the government allowed 100% FDI under the automatic route. However, it mandates that any Indian insurance company having foreign investment must have at least one individual among the Chairperson of its board, its MD, or its CEO who is a resident Indian citizen.",
+    "correctIndex": 1
+  },
+  {
+    "id": 4,
+    "question_bn": "বীমা খাতে বিদেশী বিনিয়োগের ক্ষেত্রে ভারতীয় জীবন বীমা নিগম (LIC) এবং বীমা মধ্যস্থতাকারীদের (Insurance Intermediaries) জন্য নির্ধারিত এফডিআই (FDI) সীমার সঠিক পার্থক্যটি কী?",
+    "options_bn": [
+      "এলআইসি-র জন্য এফডিআই সীমা 100% এবং বীমা মধ্যস্থতাকারীদের জন্য 74%",
+      "এলআইসি-র জন্য এফডিআই সীমা 20% এ সীমাবদ্ধ এবং বীমা মধ্যস্থতাকারীদের জন্য এটি 100%",
+      "উভয় ক্ষেত্রেই এফডিআই সীমা সমানভাবে 100% নির্ধারণ করা হয়েছে",
+      "এলআইসি-র জন্য এফডিআই সম্পূর্ণ নিষিদ্ধ এবং বীমা মধ্যস্থতাকারীদের জন্য এটি 50%"
+    ],
+    "explanation_bn": "সংশোধিত নিয়ম অনুসারে, সাধারণ বীমা কোম্পানি এবং বীমা মধ্যস্থতাকারীদের (যেমন- যারা সরাসরি বীমা বিক্রি করে না বরং কোম্পানি ও গ্রাহকের মধ্যে সেতু হিসেবে কাজ করে) জন্য এফডিআই সীমা 100% করা হলেও, লাইফ ইন্স্যুরেন্স কর্পোরেশন বা এলআইসি (LIC)-তে বিদেশী বিনিয়োগের সর্বোচ্চ সীমা 20 শতাংশে সীমাবদ্ধ (capped) রাখা হয়েছে।",
+    "question_en": "What is the correct distinction regarding FDI limits between the Life Insurance Corporation of India (LIC) and insurance intermediaries under the current regulations?",
+    "options_en": [
+      "The FDI limit is 100% for LIC and 74% for insurance intermediaries",
+      "Foreign investment in LIC is capped at 20%, while for insurance intermediaries, it stands at 100%",
+      "Both LIC and insurance intermediaries have an equal FDI cap of 100%",
+      "Foreign investment is completely prohibited in LIC and capped at 50% for intermediaries"
+    ],
+    "explanation_en": "While full foreign ownership (100% FDI) is permitted for insurance companies and insurance intermediaries (entities acting as a bridge between customers and insurers), foreign investment in the state-run Life Insurance Corporation of India (LIC) remains strictly capped at 20 per cent.",
+    "correctIndex": 1
+  },
+  {
+    "id": 5,
+    "question_bn": "আন্তর্জাতিক চলচ্চিত্র উৎসব (IFFI) সম্পর্কিত নিম্নলিখিত বিবৃতিগুলি বিবেচনা করুন:\n1 এটি দক্ষিণ এশিয়ার প্রাচীনতম চলচ্চিত্র উৎসব যা 1952 সালে প্রতিষ্ঠিত হয়।\n2 এর 57তম সংস্করণের উৎসব পরিচালক হিসেবে চলচ্চিত্র নির্মাতা আশুतोष গোয়ারিকরকে নিযুক্ত করা হয়েছে।\nউপরের বিবৃতিগুলির মধ্যে কোনটি/কোনগুলি সঠিক?\n(A) কেবল 1\n(B) কেবল 2\n(C) 1 এবং 2 উভয়ই\n(D) কোনোটিই নয়",
+    "options_bn": [
+      "কেবল 1",
+      "কেবল 2",
+      "1 এবং 2 উভয়ই",
+      "কোনোটিই নয়"
+    ],
+    "explanation_bn": "তথ্য অনুযায়ী দুটি বিবৃতিই সঠিক। ইন্টারন্যাশনাল ফিল্ম ফেস্টিভ্যাল অফ ইন্ডিয়া (IFFI) 1952 সালে প্রতিষ্ঠিত হয় এবং এটি দক্ষিণ এশিয়ার প্রাচীনতম চলচ্চিত্র উৎসব। তথ্য ও সম্প্রচার মন্ত্রক এর 57তম সংস্করণের জন্য (যা গোয়ায় অনুষ্ঠিত হবে) বিখ্যাত চলচ্চিত্র নির্মাতা আশুतोष গোয়ারিকরকে উৎসব পরিচালক (Festival Director) হিসেবে নিযুক্ত করেছে।",
+    "question_en": "Consider the following statements regarding the International Film Festival of India (IFFI):\n1 It is South Asia's oldest film festival, established in 1952.\n2 Filmmaker Ashutosh Gowariker has been appointed as the Festival Director for its 57th edition.\nWhich of the statements given above is/are correct?",
+    "options_en": [
+      "1 only",
+      "2 only",
+      "Both 1 and 2",
+      "Neither 1 nor 2"
+    ],
+    "explanation_en": "Both statements are correct. IFFI is South Asia's oldest film festival, having been established in 1952. The Ministry of Information & Broadcasting has appointed noted filmmaker Ashutosh Gowariker as the Festival Director for the 57th edition of the festival to be held in Goa.",
+    "correctIndex": 2
+  },
+  {
+    "id": 6,
+    "question_bn": "ভারতের প্রথম 'মাল্টি-লেন ফ্রি ফ্লো' (MLFF) ব্যারিয়ার-লেস টোলিং সিস্টেম সম্পর্কে নিচের কোন তথ্যটি সঠিক নয়?",
+    "options_bn": [
+      "এটি গুজরাটের এনএইচ-48 (NH-48)-এর চোরায়াসী টোল প্লাজায় চালু করা হয়েছে",
+      "এই ব্যবস্থাটি কার্যকর করতে স্বয়ংক্রিয় নম্বর প্লেট সনাক্তকরণ (ANPR) প্রযুক্তি ব্যবহৃত হয়",
+      "এই প্রযুক্তির মাধ্যমে টোল আদায়ের জন্য যানবাহনগুলিকে টোল প্লাজায় থামানোর প্রয়োজন হয় না",
+      "এটি ভারতের সড়ক ও মহাসড়ক মন্ত্রক এবং ক্যালিফোর্নিয়ার একটি স্টার্টআপের যৌথ উদ্যোগের মাধ্যমে তৈরি প্রথম ব্যবস্থা"
+    ],
+    "explanation_bn": "কেন্দ্রীয় মন্ত্রী নীতিন গড়করী গুজরাটের সুরাট-ভরুচ সেকশনের NH-48-এর চোরায়াসী টোল প্লাজায় ভারতের প্রথম মাল্টি-লেন ফ্রি ফ্লো (MLFF) ব্যারিয়ার-লেস টোলিং সিস্টেম চালু করেছেন। এটি FASTag এবং ANPR প্রযুক্তির সাহায্যে গাড়ি না থামিয়ে নির্বিঘ্নে টোল সংগ্রহ করে। ক্যালিফোর্নিয়ার কোনো স্টার্টআপের সাথে এর যৌথ উদ্যোগের কথা নথিতে উল্লেখ নেই।",
+    "question_en": "Which of the following is NOT correct regarding India's first Multi-Lane Free Flow (MLFF) barrier-less tolling system?",
+    "options_en": [
+      "It was launched at the Chorayasi Toll Plaza on the Surat-Bharuch section of NH-48 in Gujarat",
+      "It utilizes advanced technologies such as Automatic Number Plate Recognition (ANPR)",
+      "The system allows seamless toll collection without requiring vehicles to stop",
+      "It was developed through a joint venture between the Ministry of Road Transport and a California-based startup"
+    ],
+    "explanation_en": "Statements A, B, and C are explicitly supported by the text. The system enables seamless toll collection without vehicles stopping by using ANPR and FASTag. There is no mention in the document of any collaboration or joint venture with a California-based startup for this system.",
+    "correctIndex": 3
+  },
+  {
+    "id": 7,
+    "question_bn": "এনসিইআরটি (NCERT) দ্বারা বিকশিত 'PRASHAST 2.0' ডিজিটাল প্ল্যাটফর্মটির মূল কাজ কী?",
+    "options_bn": [
+      "গ্রামীণ এলাকার স্কুলগুলিতে শিক্ষকদের ডিজিটাল প্রশিক্ষণ প্রদান করা",
+      "স্কুলে প্রাথমিক পর্যায়েই প্রতিবন্ধী শিশুদের চিহ্নিত করা এবং অন্তর্ভুক্তিমূলক শিক্ষাকে উৎসাহিত করা",
+      "দশম ও দ্বাদশ শ্রেণীর শিক্ষার্থীদের জন্য অনলাইন ক্যারিয়ার কাউন্সেলিং করা",
+      "স্কুলগুলির পরিকাঠামো এবং ক্রীড়া সুবিধার মূল্যায়ন করা"
+    ],
+    "explanation_bn": "PRASHAST 2.0 (Pre-Assessment Holistic Screening Tool) হলো এনসিইআরটি (NCERT) দ্বারা তৈরি একটি মোবাইল অ্যাপ-ভিত্তিক ডিজিটাল প্ল্যাটফর্ম। এটি স্কুলগুলিকে প্রাথমিক পর্যায়েই প্রতিবন্ধী শিশুদের (Disabilities) চিহ্নিত করতে সাহায্য করে এবং অন্তর্ভুক্তিমূলক শিক্ষাকে (Inclusive Education) উন্নীত করে।",
+    "question_en": "What is the primary function of the 'PRASHAST 2.0' digital platform developed by NCERT?",
+    "options_en": [
+      "To provide digital training to teachers in rural schools",
+      "To help schools identify children with disabilities at an early stage and promote inclusive education",
+      "To conduct online career counseling for students of classes 10 and 12",
+      "To evaluate the infrastructure and sports facilities of schools"
+    ],
+    "explanation_en": "PRASHAST 2.0 (Pre-Assessment Holistic Screening Tool) is a mobile app-based digital platform developed by NCERT. It is designed to assist schools in identifying 21 types of disabilities in children at an early stage, thereby promoting inclusive education.",
+    "correctIndex": 1
+  },
+  {
+    "id": 8,
+    "question_bn": "'PRASHAST 2.0' অ্যাপটি নিচের কোন আইনের অধীনে থাকা প্রতিবন্ধকতা বা অক্ষমতাগুলি চিহ্নিত করতে সাহায্য করে?",
+    "options_bn": [
+      "ভারতীয় প্রতিবন্ধী ব্যক্তি আইন, 1995",
+      "জাতীয় শিক্ষা নীতি (NEP), 2020",
+      "প্রতিবন্ধী ব্যক্তিদের অধিকার (RPWD) আইন, 2016",
+      "বিনামূল্যে এবং বাধ্যতামূলক শিক্ষার অধিকার আইন, 2009"
+    ],
+    "explanation_bn": "নথিতে স্পষ্টভাবে উল্লেখ করা হয়েছে যে, 'PRASHAST 2.0' মোবাইল অ্যাপ-ভিত্তিক স্ক্রিনিং টুলটি 'প্রতিবন্ধী ব্যক্তিদের অধিকার (RPWD) আইন, 2016' (Rights of Persons with Disabilities Act, 2016) অনুসারে 21 ধরনের প্রতিবন্ধকতা বা অক্ষমতা চিহ্নিত করতে সাহায্য করে।",
+    "question_en": "The 'PRASHAST 2.0' app helps identify types of disabilities in accordance with which of the following Acts?",
+    "options_en": [
+      "The Persons with Disabilities India Act, 1995",
+      "The National Education Policy (NEP), 2020",
+      "The Rights of Persons with Disabilities (RPWD) Act, 2016",
+      "The Right to Free and Compulsory Education Act, 2009"
+    ],
+    "explanation_en": "The digital screening tool PRASHAST 2.0 is designed to help schools screen and identify 21 types of disabilities as recognized under the Rights of Persons with Disabilities (RPWD) Act, 2016.",
+    "correctIndex": 2
+  },
+  {
+    "id": 9,
+    "question_bn": "স্টকহোম আন্তর্জাতিক শান্তি গবেষণা ইনস্টিটিউট (SIPRI)-এর 2025 সালের প্রতিবেদন অনুসারে, বিশ্বব্যাপী সামরিক ব্যয়ের ক্ষেত্রে ভারতের অবস্থান এবং বৈশ্বিক অংশে তার অবদান কত?",
+    "options_bn": [
+      "ভারত বিশ্বের তৃতীয় বৃহত্তম সামরিক ব্যয়কারী দেশ এবং বৈশ্বিক ব্যয়ের 10% অংশীদার",
+      "ভারত বিশ্বের পঞ্চম বৃহত্তম সামরিক ব্যয়কারী দেশ এবং বৈশ্বিক ব্যয়ের 3.2% অংশীদার",
+      "ভারত বিশ্বের চতুর্থ বৃহত্তম সামরিক ব্যয়কারী দেশ এবং বৈশ্বিক ব্যয়ের 5.5% অংশীদার",
+      "ভারত বিশ্বের দ্বিতীয় বৃহত্তম সামরিক ব্যয়কারী দেশ এবং বৈশ্বিক ব্যয়ের 8.9% অংশীদার"
+    ],
+    "explanation_bn": "সিপ্রি (SIPRI)-এর প্রতিবেদন অনুসারে, 2025 সালে 92.1 বিলিয়ন ডলার ব্যয়ের মাধ্যমে ভারত বিশ্বের পঞ্চম বৃহত্তম সামরিক ব্যয়কারী দেশ (5th Top Military Spender) হয়েছে। মোট বৈশ্বিক সামরিক ব্যয়ে ভারতের অবদানের অংশ ছিল 3.2 শতাংশ।",
+    "question_en": "According to the 2025 report by the Stockholm International Peace Research Institute (SIPRI), what is India's position among global military spenders and its share in global expenditure?",
+    "options_en": [
+      "India is the 3rd largest military spender accounting for 10% of global spending",
+      "India is the 5th largest military spender accounting for 3.2% of global military expenditure",
+      "India is the 4th largest military spender accounting for 5.5% of global spending",
+      "India is the 2nd largest military spender accounting for 8.9% of global spending"
+    ],
+    "explanation_en": "According to the SIPRI report, India is the world's fifth-biggest military spender, having spent $92.1 billion on defence in 2025. This defence expenditure accounted for exactly 3.2 per cent of the total global military expenditure.",
+    "correctIndex": 1
+  },
+  {
+    "id": 10,
+    "question_bn": "2025 সালে বৈশ্বিক সামরিক ব্যয় সম্পর্কিত নিচের কোন তথ্যটি সিপ্রি (SIPRI)-এর প্রতিবেদন দ্বারা সমর্থিত?",
+    "options_bn": [
+      "বৈশ্বিক সামরিক ব্যয় বিশ্বব্যাপী জিডিপির 5% এ পৌঁছেছে, যা দ্বিতীয় বিশ্বযুদ্ধের পর সর্বোচ্চ",
+      "বৈশ্বিক সামরিক ব্যয় 2024 সালের তুলনায় 2.9% বৃদ্ধি পেয়ে 2,887 বিলিয়ন ডলারে পৌঁছেছে, যা বৈশ্বিক জিডিপির 2.5%",
+      "কেবল মার্কিন যুক্তরাষ্ট্র এবং চীনই বিশ্বের মোট সামরিক ব্যয়ের 80% এর জন্য দায়ী",
+      "2025 সালে বৈশ্বিক সামরিক ব্যয় পূর্ববর্তী বছরের তুলনায় হ্রাস পেয়েছে"
+    ],
+    "explanation_bn": "নথিতে উল্লিখিত তথ্য অনুযায়ী, 2025 সালে বিশ্বব্যাপী সামরিক ব্যয় 2,887 বিলিয়ন ডলারে পৌঁছেছে, যা 2024 সালের তুলনায় 2.9 শতাংশ বৃদ্ধি প্রদর্শন করে। এটি বৈশ্বিক জিডিপির 2.5 শতাংশের সমান, যা 2009 সালের পর থেকে সর্বোচ্চ অংশ।",
+    "question_en": "Which of the following facts regarding global military expenditure in 2025 is supported by the SIPRI report?",
+    "options_en": [
+      "Global military expenditure reached 5% of global GDP, the highest since World War II",
+      "Global military expenditure touched $2,887 billion in 2025, a 2.9% rise from 2024, equaling 2.5% of global GDP",
+      "The United States and China alone accounted for 80% of total global military spending",
+      "Global military expenditure saw a net decline in 2025 compared to the previous year"
+    ],
+    "explanation_en": "The SIPRI data shows that world military expenditure touched $2,887 billion in 2025, which represents a 2.9 per cent rise from 2024. This total expenditure equals 2.5 per cent of global GDP, marking the highest share since 2009.",
+    "correctIndex": 1
+  },
+  {
+    "id": 11,
+    "question_bn": "ভারতের 'Bad Bank' নামে পরিচিত ন্যাশনাল অ্যাসেট রিকনস্ট্রাকশন কোম্পানি লিমিটেড (NARCL) সম্পর্কে নিচের কোনটি সঠিক তথ্য?",
+    "options_bn": [
+      "এটি 2021 সালে প্রতিষ্ঠিত একটি বিশেষ প্রতিষ্ঠান যা ব্যাংকগুলির অনুত্পাদক সম্পদ (NPA) কিনে টাকা পুনরুদ্ধারের চেষ্টা করে",
+      "এটি সম্পূর্ণ বেসরকারি মালিকানাধীন একটি সম্পদ পুনর্গঠন সংস্থা যা আরবিআই (RBI) দ্বারা পরিচালিত হয়",
+      "এটি অর্থ মন্ত্রকের একটি বিভাগ যা সরাসরি কর সংগ্রহের তদারকি করে",
+      "এটি কেবল বিদেশী বাণিজ্যিক ব্যাংকগুলির খারাপ ঋণ পুনরুদ্ধারের জন্য কাজ করে"
+    ],
+    "explanation_bn": "এনএআরসিএল (NARCL) হলো ভারত সরকার সমর্থিত একটি বিশেষ প্রতিষ্ঠান বা \"ব্যাড ব্যাংক\" (Bad Bank), যা 2021 সালে প্রতিষ্ঠিত হয়। এর মূল কাজ হলো ব্যাংকগুলির খারাপ ঋণ বা অনুত্পাদক সম্পদ (NPA) নিজের নিয়ন্ত্রণে নেওয়া এবং সেগুলি থেকে টাকা উদ্ধার বা পুনরুদ্ধার করার চেষ্টা করা।",
+    "question_en": "Which of the following is correct regarding the National Asset Reconstruction Company Limited (NARCL), known as India's \"Bad Bank\"?",
+    "options_en": [
+      "It is a special institution established in 2021 to deal with bad loans (NPAs) of banks and recover money from them",
+      "It is a fully privately owned asset reconstruction company managed directly by the RBI",
+      "It is a department under the Finance Ministry that oversees direct tax collections",
+      "It is an institution created exclusively to recover bad loans from foreign commercial banks"
+    ],
+    "explanation_en": "NARCL is a government-backed \"bad bank\" established in 2021. It is a special institution created to acquire non-performing assets (NPAs) or bad loans from banks and undertake measures to recover the outstanding money from those distressed borrower entities.",
+    "correctIndex": 0
+  },
+  {
+    "id": 12,
+    "question_bn": "2025-26 অর্থবছর পর্যন্ত এনএআরসিএল (NARCL)-এর আর্থিক পুনরুদ্ধার বা রিকভারি পারফরম্যান্সের বৈশিষ্ট্য কোনটি?",
+    "options_bn": [
+      "এটি তার লক্ষ্যমাত্রার মাত্র 10% পুনরুদ্ধার করতে পেরেছে এবং ব্যাপক লোকসানের সম্মুখীন হয়েছে",
+      "এটি 25-26 অর্থবছরে 4,364 কোটি টাকা উদ্ধার করেছে, যা এর আজ পর্যন্ত মোট পুনরুদ্ধারের প্রায় 70%",
+      "এটি সমস্ত সংগৃহীত অর্থ সরাসরি জীবন বীমা নিগমের (LIC) তহবিলে স্থানান্তর করেছে",
+      "এটি কোনো ঋণ পুনরুদ্ধার করতে না পারায় সরকার এটি বন্ধ করার সিদ্ধান্ত নিয়েছে"
+    ],
+    "explanation_bn": "অর্থ মন্ত্রকের তথ্য অনুযায়ী, NARCL অর্থ বছর 20Check-26-এ তার পুনরুদ্ধার প্রচেষ্টাকে উল্লেখযোগ্যভাবে ত্বরান্বিত করেছে। এই এক বছরে সংস্থাটি 4,364 কোটি টাকা পুনরুদ্ধার করেছে, যা আজ পর্যন্ত তার মোট সঞ্চিত বা সামগ্রিক পুনরুদ্ধারের (Cumulative Recoveries) প্রায় 70%।",
+    "question_en": "What characterized the recovery performance of NARCL in the Financial Year 2025-26?",
+    "options_en": [
+      "It managed to recover only 10% of its target, leading to severe financial distress",
+      "It recovered ₹4,364 crore during the year, accounting for nearly 70% of its total recoveries to date",
+      "It transferred all recovered assets directly to the Life Insurance Corporation (LIC) fund",
+      "It failed to recover any bad loans, leading the government to dissolve the entity"
+    ],
+    "explanation_en": "According to the Ministry of Finance, NARCL significantly accelerated its recovery efforts in FY 2025-26, recovering ₹4,364 crore during that single year. This amount accounted for nearly 70% of its total cumulative recoveries achieved to date.",
+    "correctIndex": 1
+  },
+  {
+    "id": 13,
+    "question_bn": "ভারতের প্রথম নিজস্ব বেসরকারি ডোমেনের আর্থ অবজারভেশন স্যাটেলাইট 'Mission Drishti' সম্পর্কে নিচের কোনটি সত্য?",
+    "options_bn": [
+      "এটি ইসরো (ISRO) দ্বারা শ্রীহরিকোটা থেকে সম্পূর্ণরূপে তৈরি ও উৎক্ষেপণ করা হয়েছে",
+      "এটি ব্যাঙ্গালোর-ভিত্তিক স্টার্টআপ গ্যালাক্সআই (GalaxEye) দ্বারা তৈরি একটি অপ্টোসার (OptoSAR) স্যাটেলাইট যা স্পেসএক্স-এর ফ্যালকন 9 রকেটের মাধ্যমে উৎক্ষেপণ করা হয়েছে",
+      "এটি একটি ক্ষুদ্র 5 কেজি ওজনের স্যাটেলাইট যা কেবল দিনের আলোয় ছবি তুলতে সক্ষম",
+      "এটি ক্যালিফোর্নিয়ার সমুদ্র উপকূলবর্তী আবহাওয়া পর্যবেক্ষণের জন্য তৈরি করা হয়েছে"
+    ],
+    "explanation_bn": "মিশন দৃষ্টি (Mission Drishti) হলো ভারতের বৃহত্তম বেসরকারিভাবে তৈরি পৃথিবী পর্যবেক্ষণ উপগ্রহ (ওজন প্রায় 190 কেজি)। এটি ব্যাঙ্গালোর-ভিত্তিক স্টার্টআপ গ্যালাক্সআই (GalaxEye) দ্বারা তৈরি বিশ্বের প্রথম 'OptoSAR' উপগ্রহ, যা 3 মে, 2026-এ ক্যালিফোর্নিয়া থেকে স্পেসএক্স (SpaceX) ফ্যালকন 9 রকেটের সাহায্যে সফলভাবে উৎক্ষেপণ করা হয়।",
+    "question_en": "Which of the following is true about 'Mission Drishti', India's landmark satellite project?",
+    "options_en": [
+      "It was built and launched entirely by ISRO from Sriharikota for military surveillance",
+      "It is the world's first OptoSAR satellite developed by Bengaluru-based startup GalaxEye and launched aboard a SpaceX Falcon 9 rocket",
+      "It is a small 5 kg communication satellite designed exclusively for educational applications",
+      "It is an atmospheric satellite built to track coastal weather conditions near California"
+    ],
+    "explanation_en": "Mission Drishti is India's largest privately developed Earth observation satellite (weighing around 190 kg), developed by Bengaluru-based startup GalaxEye. It is the world's first OptoSAR satellite, successfully launched on May 3, 2026, aboard a SpaceX Falcon 9 rocket from California.",
+    "correctIndex": 1
+  },
+  {
+    "id": 14,
+    "question_bn": "'मिशन दृष्टि' (Mission Drishti)-তে ব্যবহৃত 'OptoSAR' প্রযুক্তির বিশেষ কার্যকারিতা কী?",
+    "options_bn": [
+      "এটি কেবল সমুদ্রের গভীরতার জলজ উদ্ভিদের ছবি তুলতে অপটিক্যাল লেন্স ব্যবহার করে",
+      "এটি একটি উপগ্রহে দুটি প্রযুক্তিকে একত্রিত করে: দিনের আলোতে স্পষ্ট ছবির জন্য ইলেকট্রো-অপটিক্যাল (EO) এবং রাতে ও খারাপ আবহাওয়ায় কাজের জন্য সিন্থেটিক অ্যাপারচার রাডার (SAR)",
+      "এটি মহাকাশের ব্ল্যাক হোল থেকে আসা এক্স-রে তরঙ্গ সনাক্ত করতে পারে",
+      "এটি ইন্টারনেট সংযোগের গতি বাড়াতে লেজার প্রযুক্তির সুবিধা প্রদান করে"
+    ],
+    "explanation_bn": "মিশন দৃষ্টি বিশ্বের প্রথম অপ্টোসার (OptoSAR) স্যাটেলাইট হওয়ার গৌরব অর্জন করেছে কারণ এটি একই সাথে দুটি উন্নত প্রযুক্তিকে একত্রিত করে: দিনের আলোতে পরিষ্কার ছবি তোলার জন্য ইলেকট্রো-অপটিক্যাল (EO) ইমেজ প্রযুক্তি এবং রাত বা মেঘলা ও খারাপ আবহাওয়াতেও নিখুঁতভাবে কাজ করার জন্য সিন্থেটিক অ্যাপারচার রাডার (SAR) প্রযুক্তি।",
+    "question_en": "What unique operational advantage does the 'OptoSAR' technology used in Mission Drishti provide?",
+    "options_en": [
+      "It utilizes deep ultraviolet lenses to capture high-resolution images of marine life",
+      "It combines Electro-Optical (EO) clarity in daylight with Synthetic Aperture Radar (SAR) capability for night and bad weather conditions",
+      "It senses high-energy X-ray emissions to map deep space black holes",
+      "It serves as a space-based laser relay station to boost rural broadband speeds"
+    ],
+    "explanation_en": "Mission Drishti is designated as the world's first OptoSAR satellite because it integrates two distinct sensor technologies in a single platform: Electro-Optical (EO) for high-clarity images during clear daylight, and Synthetic Aperture Radar (SAR), which penetrates darkness and bad weather.",
+    "correctIndex": 1
+  },
+  {
+    "id": 15,
+    "question_bn": "টাইমস্ হায়ার এডুকেশন (THE) এশিয়া ইউনিভার্সিটি র‍্যাংকিং 2026-এর ফলাফল বিবেচনা করে নিচের কোন বিবৃতিটি সঠিক?",
+    "options_bn": [
+      "ভারত এই র‍্যাংকিংয়ে সবচেয়ে কম প্রতিনিধিত্বকারী দেশ হিসেবে চিহ্নিত হয়েছে",
+      "টোকিও বিশ্ববিদ্যালয় এই তালিকার শীর্ষ স্থানটি দখল করেছে এবং ভারত থেকে আইআইটি দিল্লি সেরা হয়েছে",
+      "চীন এই র‍্যাংকিংয়ের প্রথম ও দ্বিতীয় স্থান ধরে রেখে শীর্ষে রয়েছে এবং ভারতের মধ্যে আইআইএসসি বেঙ্গালুরু (IISc Bengaluru) জাতীয় তালিকায় শীর্ষস্থান পেয়েছে",
+      "পাকিস্তানের সমস্ত বিশ্ববিদ্যালয় ভারতের শিক্ষা প্রতিষ্ঠানের চেয়ে উচ্চতর র‍্যাংক অর্জন করেছে"
+    ],
+    "explanation_bn": "'THE Asia University Rankings 2026' অনুসারে, চীনের সিংহুয়া বিশ্ববিদ্যালয় এবং পিকিং বিশ্ববিদ্যালয় যথাক্রমে প্রথম ও দ্বিতীয় স্থান ধরে রেখে সামগ্রিক তালিকায় আধিপত্য বজায় রেখেছে। অন্যদিকে, ভারত 128টি প্রতিষ্ঠানের সাথে সবচেয়ে বেশি প্রতিনিধিত্বকারী দেশ এবং ভারতীয় প্রতিষ্ঠানগুলির মধ্যে আইআইএসসি বেঙ্গালুরু (সামগ্রিক এশিয়া র‍্যাংক 43) জাতীয় তালিকায় শীর্ষে রয়েছে।",
+    "question_en": "Based on the Times Higher Education (THE) Asia University Rankings 2026, which of the following statements is accurate?",
+    "options_en": [
+      "India is the least-represented nation in the ranking with only a handful of colleges",
+      "The University of Tokyo holds the absolute top position, while IIT Delhi leads the Indian contingent",
+      "China leads the rankings retaining the top two spots, while IISc Bengaluru tops the national list within India",
+      "All universities from Pakistan are ranked substantially higher than India's premier institutes"
+    ],
+    "explanation_en": "The THE Asia University Rankings 2026 show that mainland Chinese institutions (Tsinghua University and Peking University) retain the 1st and 2nd positions. Within India, which is the most-represented nation with 128 ranked institutions, the Indian Institute of Science (IISc) Bengaluru secured the top national position (Asia Rank 43).",
+    "correctIndex": 2
+  },
+  {
+    "id": 16,
+    "question_bn": "ভারত কর্তৃক জ্যামাইকাতে মোতায়েন করা 'আরোগ্য মিত্রী' (Aarogya Maitri) পোর্টেবল স্বাস্থ্যসেবা ব্যবস্থাটি মূলত কোন জাতীয় উদ্যোগ বা কাঠামোর অংশ?",
+    "options_bn": [
+      "সার্ক (SAARC) অঞ্চলের অর্থনৈতিক সহযোগিতা বৃদ্ধি কর্মসূচী",
+      "মানবিক সহায়তা এবং বিপর্যয় ত্রাণ (HADR) কাঠামোর অধীনে 'भीष्म' (BHISHM) উদ্যোগ",
+      "বিশ্ব স্বাস্থ্য সংস্থার (WHO) ল্যাটিন আমেরিকা ম্যালেরিয়া দূরীকরণ মিশন",
+      "নীতি আয়োগের ডিজিটাল স্বাস্থ্য মিশন 2047 রোডম্যাপ"
+    ],
+    "explanation_bn": "ভারত তার মানবিক সহায়তা এবং বিপর্যয় ত্রাণ (HADR) কাঠামোর অধীনে ক্যারিবীয় দেশগুলির সাথে সম্পর্ক জোরদার করতে জ্যামাইকাতে 'আরোগ্য মৈত্রী' পোর্টেবল স্বাস্থ্যসেবা ব্যবস্থা মোতায়েন করেছে। এটি মূলত 'ভিষ্ম' (BHISHM - Bharat Health Initiative for Sahyog Hita & Maitri) উদ্যোগের অংশ।",
+    "question_en": "The 'Aarogya Maitri' portable healthcare system deployed by India in Jamaica operates under which overarching framework?",
+    "options_en": [
+      "The SAARC regional trade development program",
+      "The BHISHM initiative under India's Humanitarian Assistance and Disaster Relief (HADR) framework",
+      "The WHO-led Latin American malaria elimination taskforce",
+      "NITI Aayog's digital health infrastructure road map for 2047"
+    ],
+    "explanation_en": "India deployed the Aarogya Maitri portable healthcare system in Jamaica to strengthen ties with Caribbean nations. This deployment was conducted under its Humanitarian Assistance and Disaster Relief (HADR) framework as part of the broader BHISHM (Bharat Health Initiative for Sahyog Hita & Maitri) project.",
+    "correctIndex": 1
+  },
+  {
+    "id": 17,
+    "question_bn": "'ভিষ্ম কিউব' (BHISHM Cube) পোর্টেবল বা মোবাইল হাসপাতালের প্রধান বৈশিষ্ট্য এবং চিকিত্সা ক্ষমতা কী?",
+    "options_bn": [
+      "এটি কেবল ক্যান্সার রোগীদের থেরাপির জন্য বিশেষায়িত এবং একসঙ্গে 500 জন রোগীকে দীর্ঘমেয়াদী সেবা দেয়",
+      "এটি একটি দুর্যোগকালীন জরুরি মোবাইল ইউনিট, যার মধ্যে ওষুধ, আইসিইউ (ICU) সেটআপ ও সার্জিক্যাল সরঞ্জাম রয়েছে এবং এটি প্রায় 200 জন রোগীর চিকিৎসা করতে পারে",
+      "এটি একটি রোবোটিক ল্যাব যা সম্পূর্ণ দূর নিয়ন্ত্রিত উপায়ে কাজ করে এবং এতে কোনো শয্যা নেই",
+      "এটি কেবল ম্যালেরিয়ার প্রতিষেধক তৈরির জন্য একটি পোর্টেবল গবেষণাগার"
+    ],
+    "explanation_bn": "'ভিষ্ম কিউব' (BHISHM Cube) হলো দুর্যোগ বা জরুরি পরিস্থিতির জন্য তৈরি একটি অত্যন্ত আধুনিক মোবাইল বা পোর্টেবল হাসপাতাল ইউনিট। এর ভেতরে নিজস্ব আইসিইউ (ICU) সেটআপ, প্রয়োজনীয় ওষুধপত্র এবং জটিল অস্ত্রোপচারের বা সার্জিক্যাল সরঞ্জাম থাকে, যা অত্যন্ত দ্রুততার সাথে প্রায় 200 জন রোগীর জরুরি চিকিৎসা নিশ্চিত করতে সক্ষম।",
+    "question_en": "What are the key contents and treating capacity of the emergency mobile hospital unit known as the 'BHISHM Cube'?",
+    "options_en": [
+      "It is specialized entirely for oncology radiation treatments with a core capacity for 500 bedded long term care",
+      "It contains medicines, an ICU setup, and surgical equipment, with the capacity to treat around 200 patients in disaster situations",
+      "It functions as a fully unmanned robotic testing facility without any casualty treatment space",
+      "It is a container lab dedicated strictly to synthesizing malaria vaccines"
+    ],
+    "explanation_en": "The BHISHM Cube is a highly compressed, emergency mobile hospital unit. It is packed with vital emergency medicines, an integrated ICU infrastructure, and essential surgical gear capable of successfully managing and treating approximately 200 trauma or disaster patients.",
+    "correctIndex": 1
+  },
+  {
+    "id": 18,
+    "question_bn": "ভারতের কেন্দ্রীয় প্রত্যক্ষ কর বোর্ড (CBDT) দ্বারা প্রকাশিত 2025-26 অর্থবছরের তথ্যের ভিত্তিতে সংগৃহীত করের সঠিক বিবরণ কোনটি?",
+    "options_bn": [
+      "কর্পোরেট করের তুলনায় সিকিউরিটিজ ট্রানজেকশন ট্যাক্স (STT) এর পরিমাণ বেশি ছিল",
+      "নেট প্রত্যক্ষ কর সংগ্রহ 5.12% বৃদ্ধি পেয়ে 23.4 লাখ কোটি টাকায় পৌঁছেছে এবং কর্পোরেট কর সংগ্রহ ছিল 13.81 লাখ কোটি টাকা",
+      "কোনো কর সংগ্রহ বৃদ্ধি পায়নি, বরং গত বছরের তুলনায় সংগৃহীত করের পরিমাণ 10% হ্রাস পেয়েছে",
+      "ব্যক্তিগত আয়কর সংগ্রহ সম্পূর্ণরূপে বন্ধ করে কেবল কর্পোরেট কর আদায় করা হয়েছে"
+    ],
+    "explanation_bn": "সিবিডিটি (CBDT)-এর তথ্য অনুযায়ী, অর্থ বছর 2025-26-এ ভারতের নেট প্রত্যক্ষ কর সংগ্রহ বার্ষিক 5.12% বৃদ্ধি পেয়ে 23,40,406 কোটি টাকা (প্রায় 23.4 লাখ কোটি) হয়েছে। এর মধ্যে কর্পোরেট কর সংগ্রহ দাঁড়িয়েছে 13,81,606 কোটি টাকায় এবং সিকিউরিটিজ ট্রানজেকশন ট্যাক্স (STT) ছিল 57,522 কোটি টাকা।",
+    "question_en": "Based on the direct tax collection data released by the CBDT for the fiscal year 2025-26, which of the following statements details the correct breakdown?",
+    "options_en": [
+      "Securities Transaction Tax (STT) collections surpassed the total corporate tax collections",
+      "Net direct tax collections rose 5.12% year-on-year to ₹23.4 lakh crore, with corporate tax collections rising to ₹13.81 lakh crore",
+      "Direct tax revenues shrank uniformly by 10% compared to the historical baseline of 2024-25",
+      "Individual non-corporate tax collections were entirely abolished, shifting the tax weight to corporate houses"
+    ],
+    "explanation_en": "Data released by the Central Board of Direct Taxes (CBDT) indicates that India's net direct tax collections grew by 5.12 per cent year-on-year to touch ₹23,40,406 crore (~₹23.4 lakh crore) in FY 2025-26. Within this, corporate tax collections accounted for ₹13,81,606 crore.",
+    "correctIndex": 1
+  },
+  {
+    "id": 19,
+    "question_bn": "এশিয়ান ডেভেলপমেন্ট ব্যাংক (ADB) কর্তৃক ঘোষিত 2035 সালের আঞ্চলিক কানেক্টিভিটি পরিকল্পনার দুটি প্রধান উপাদান কী কী?",
+    "options_bn": [
+      "50 বিলিয়ন ডলারের 'প্যান-এশিয়া পাওয়ার গ্রিড উদ্যোগ' এবং 20 বিলিয়ন ডলারের 'এশিয়া-প্যাসিফিক ডিজিটাল হাইওয়ে'",
+      "100 বিলিয়ন ডলারের বুলেট ট্রেন করিডোর এবং 50 বিলিয়ন ডলারের গভীর সমুদ্র বন্দর প্রকল্প",
+      "কেবল সার্ক (SAARC) ভুক্ত দেশগুলির মধ্যে সড়ক ও মহাসড়ক উন্নয়নের জন্য 70 বিলিয়ন ডলারের তহবিল",
+      "প্রশান্ত মহাসাগরীয় অঞ্চলের দ্বীপরাষ্ট্রগুলিতে 100% সৌর শক্তি চালিত গ্রিড স্থাপন পরিকল্পনা"
+    ],
+    "explanation_bn": "এশীয় উন্নয়ন ব্যাংক (ADB) তার 59তম বার্ষিক সভায় এশিয়া-প্রশান্ত মহাসাগরীয় অঞ্চলের জন্য 2035 সালের মধ্যে একটি 70 বিলিয়ন ডলারের কানেক্টিভিটি পরিকল্পনা ঘোষণা করেছে। এর দুটি মূল অংশ হলো: 50 বিলিয়ন ডলারের প্যান-এশিয়া পাওয়ার গ্রিড ইনিশিয়েটিভ (Pan-Asia Power Grid Initiative) এবং 20 বিলিয়ন ডলারের এশিয়া-প্যাসিফিক ডিজিটাল হাইওয়ে (Asia-Pacific Digital Highway)।",
+    "question_en": "What are the two major structural components of the $70 billion regional connectivity plan unveiled by the Asian Development Bank (ADB)?",
+    "options_en": [
+      "The $50 billion Pan-Asia Power Grid Initiative and the $20 billion Asia-Pacific Digital Highway",
+      "A $100 billion bullet train corridor and a $50 billion deep-sea maritime port initiative",
+      "Roadways and highway construction networks explicitly limited to the SAARC nations totaling $70 billion",
+      "A comprehensive 100% solar conversion network for small Pacific Island territories"
+    ],
+    "explanation_en": "The Asian Development Bank (ADB) announced a $70 billion regional connectivity blueprint scheduled through 2035 for energy and digital fields. The investment is split into two distinct parts: the $50 billion Pan-Asia Power Grid Initiative and the $20 billion Asia-Pacific Digital Highway.",
+    "correctIndex": 0
+  },
+  {
+    "id": 20,
+    "question_bn": "ক্যালিফোর্নিয়া থেকে উৎক্ষেপণ করা 'Pathfinder' স্যাটেলাইট প্রজেক্টটি ভারতের মহাকাশ প্রযুক্তির ইতিহাসে কেন একটি বিশেষ মাইলফলক?",
+    "options_bn": [
+      "এটি চাঁদ থেকে খনিজ পদার্থ আনার জন্য ভারতের প্রথম সম্পূর্ণ বেসরকারি রোবোটিক রোভার মিশন",
+      "এটি মহাকাশে সরাসরি কৃত্রিম বুদ্ধিমত্তা (AI) মডেলের প্রশিক্ষণ ও পরিচালনার জন্য পিক্সেল (Pixxel) এবং সর্বম এআই (Sarvam AI) এর যৌথ উদ্যোগে তৈরি ভারতের প্রথম অরবিটাল ডেটা সেন্টার স্যাটেলাইট",
+      "এটি সমুদ্রের গভীর তলদেশে তেলের খনি খোঁজার জন্য তৈরি একটি রাডার স্যাটেলাইট",
+      "এটি কেবল ইউকে (UK) ও ভারতের মধ্যে আবহাওয়ার তথ্য আদান-প্রদান করার একটি সাধারণ বৈজ্ঞানিক প্রজেক্ট"
+    ],
+    "explanation_bn": "স্পেস-টেক স্টার্টআপ পিক্সেল (Pixxel) এবং কৃত্রিম বুদ্ধিমত্তা তৈরিকারী সংস্থা সর্বম এআই (Sarvam AI) যৌথভাবে \"Pathfinder\" নামক ভারতের প্রথম অরবিটাল ডেটা সেন্টার উপগ্রহ (Orbital Data Centre Satellite) তৈরি করছে। প্রায় 200 কেজি ওজনের এই উপগ্রহটি 2026 সালের শেষ নাগাদ মহাকাশে সরাসরি এআই (AI) মডেলের প্রশিক্ষণ ও জটিল ডাটা প্রসেসিং পরিচালনা করতে সক্ষম হবে।",
+    "question_en": "Why is the 'Pathfinder' satellite project, built via a partnership between Pixxel and Sarvam AI, considered a major leap in Indian technology?",
+    "options_en": [
+      "It represents India's first private deep space sample-return robotic rover mission targeted at Mars",
+      "It is India's first orbital data centre satellite designed to enable the training and operation of AI models directly in space",
+      "It is a deep-sea surveillance maritime radar platform mapped out for sub-oceanic geological studies",
+      "It functions as a standard weather monitoring instrument shared strictly between the UK and India"
+    ],
+    "explanation_en": "Space-tech startup Pixxel partnered with AI firm Sarvam AI to construct \"Pathfinder,\" which is India's first orbital data centre satellite (weighing around 200 kg). The project marks a major milestone because it allows the computation, training, and deployment of complex Artificial Intelligence (AI) models directly in orbit.",
+    "correctIndex": 1
+  },
+  {
+    "id": 21,
+    "question_bn": "2026 সালের 'বিশ্ব প্রেস স্বাধীনতা সূচকাংক' (World Press Freedom Index)-এ ভারতের র্যাংক কত এবং এই সূচকের 25 বছরের ইতিহাসে বিশ্বব্যাপী পরিস্থিতি সম্পর্কে কোন ভীতিজনক প্রবণতা উঠে এসেছে?",
+    "options_bn": [
+      "ভারত 100তম স্থানে রয়েছে এবং বিশ্বের অধিকাংশ দেশে সাংবাদিকতা সম্পূর্ণ নিরাপদ হয়েছে",
+      "ভারত 180টি দেশের মধ্যে 157তম স্থানে রয়েছে এবং সূচকের ইতিহাসে প্রথমবারের মতো বিশ্বের অর্ধেকেরও বেশি দেশ প্রেস স্বাধীনতার ক্ষেত্রে \"কঠিন\" বা \"অত্যন্ত গুরুতর\" শ্রেণীতে পড়েছে",
+      "ভারত প্রথম 10টি দেশের মধ্যে স্থান পেয়েছে এবং বৈশ্বিক গড় স্কোর অভাবনীয়ভাবে বৃদ্ধি পেয়েছে",
+      "ভারত 150তম স্থানে রয়েছে এবং তার সমস্ত প্রতিবেশী দেশের পরিস্থিতি ভারতের চেয়ে খারাপ"
+    ],
+    "explanation_bn": "রিপোর্টার্স উইদাউট বর্ডারস (RSF) দ্বারা প্রকাশিত 2026 সালের বিশ্ব প্রেস স্বাধীনতা সূচকে ভারত 180টি দেশের মধ্যে 157তম স্থানে রয়েছে। প্রতিবেদনে বলা হয়েছে যে, বৈশ্বিক গড় স্কোর সর্বনিম্ন স্তরে নেমে গেছে এবং সূচকের 25 বছরের ইতিহাসে এই প্রথম বিশ্বের অর্ধেকেরও বেশি দেশ প্রেস স্বাধীনতার ক্ষেত্রে \"কঠিন\" (difficult) বা \"অত্যন্ত গুরুতর\" (very serious) বিভাগে স্থান পেয়েছে।",
+    "question_en": "What is India's rank in the 2026 World Press Freedom Index, and what alarming global trend was highlighted for the first time in the Index's 25-year history?",
+    "options_en": [
+      "India is ranked 100th, and journalism has become completely safe in the majority of nations",
+      "India is ranked 157th out of 180 countries, and more than half the world's countries now fall into the \"difficult\" or \"very serious\" categories for press freedom",
+      "India entered the top 10 group, and the average worldwide press freedom scores experienced an unprecedented surge",
+      "India is ranked 150th, and all of its immediate neighbors have recorded lower performance matrices than India"
+    ],
+    "explanation_en": "In the 2026 World Press Freedom Index issued by Reporters Without Borders (RSF), India ranks 157th among 180 nations. Crucially, the index reveals that for the first time in its 25-year tracking history, more than half of the globe's nations have dropped into the \"difficult\" or \"very serious\" zones.",
+    "correctIndex": 1
+  },
+  {
+    "id": 22,
+    "question_bn": "2026 সালের বিশ্ব প্রেস স্বাধীনতা সূচকে ভারতের স্কোর ও র্যাংকের সাথে তার প্রতিবেশী দেশগুলির তুলনামূলক অবস্থানের সঠিক বিবরণ কোনটি?",
+    "options_bn": [
+      "চীন ও পাকিস্তান উভয়ই ভারতের চেয়ে অনেক উন্নত র্যাংক অর্জন করেছে এবং প্রথম 50টি দেশের মধ্যে রয়েছে",
+      "নেপাল (87তম), শ্রীলঙ্কা (134তম), ভুটান (150তম) এবং বাংলাদেশ (152তম) ও পাকিস্তান (153তম) সহ প্রায় সমস্ত প্রতিবেশী দেশ ভারতের চেয়ে উঁচুতে অবস্থান করছে, কেবল চীন 178তম স্থানে রয়েছে",
+      "ভারতের সমস্ত প্রতিবেশী দেশ ভারতের চেয়ে পিছিয়ে রয়েছে এবং পাকিস্তান সবচেয়ে নিচে অবস্থান করছে",
+      "ভারতের র্যাংক এশিয়ার সমস্ত দেশের মধ্যে সেরা এবং এর স্কোর 90-এর উপরে"
+    ],
+    "explanation_bn": "নথিতে প্রদত্ত তথ্য অনুযায়ী, 2026 সালের সূচকে ভারতের র্যাংক 157। ভারতের প্রতিবেশী দেশগুলির মধ্যে নেপাল (87), শ্রীলঙ্কা (134), ভুটান (150), বাংলাদেশ (152) এবং পাকিস্তান (153) র্যাংকিংয়ে ভারতের উপরে রয়েছে। একমাত্র ব্যতিক্রম হলো চীন, যার র্যাংক 178তম।",
+    "question_en": "Which of the following correctly details the comparative position of India and its neighbors in the 2026 World Press Freedom Index?",
+    "options_en": [
+      "China and Pakistan have both scored exceptionally well, breaking into the top 50 nations list",
+      "Almost all of India's neighbors rank higher than India—Nepal (87th), Bhutan (150th), Bangladesh (152nd), and Pakistan (153rd)—while China ranks lower at 178th",
+      "Every single neighboring state lags behind India's 157th position, with Pakistan finishing near the absolute bottom",
+      "India leads the entire South Asian regional block with a near-perfect score exceeding 90 points"
+    ],
+    "explanation_en": "The index text clearly outlines that almost all of India's immediate geographical neighbors rank higher than India's 157th spot: Nepal is 87th, Sri Lanka is 134th, Bhutan is 150th, Bangladesh is 152nd, and Pakistan is 153rd. China, however, is lower down at 178th.",
+    "correctIndex": 1
+  },
+  {
+    "id": 23,
+    "question_bn": "মার্কিন যুক্তরাষ্ট্র সম্প্রতি ভারতকে 14 মিলিয়ন ডলার মূল্যের 657টি চুরি যাওয়া প্রাচীন শিল্পকর্ম বা প্রত্নতাত্ত্বিক নিদর্শন ফেরত দিয়েছে। এর মধ্যে থাকা বিখ্যাত 'অবলোকিতেশ্বর' (Avalokiteshvara) ব্রোঞ্জ মূর্তিটির ঐতিহাসিক পটভূমি কী?",
+    "options_bn": [
+      "এটি 2000 সালে দিল্লির একটি লাল কেল্লার খননকার্য থেকে চুরি হয়ে আমেরিকায় পাচার হয়েছিল",
+      "এটি 1939 সালে মধ্যপ্রদেশের লক্ষণ মন্দিরের কাছ থেকে আবিষ্কৃত ব্রোঞ্জ ভাণ্ডারের অংশ ছিল এবং 1952 সালের মধ্যে রায়পুরের মহন্ত ঘাসীদাস মেমোরিয়াল মিউজিয়ামের সংগ্রহে অন্তর্ভুক্ত হয়েছিল",
+      "এটি কেরালা উপকূলের একটি প্রাচীন জাহাজডুবি থেকে উদ্ধার হওয়া একটি স্বর্ণমূর্তি",
+      "এটি সম্রাট অশোকের আমলের একটি বুদ্ধ মূর্তি যা কেবল ক্যালিফোর্নিয়ার মিউজিয়ামে সংরক্ষিত ছিল"
+    ],
+    "explanation_bn": "আমেরিকার ফেরত দেওয়া 657টি প্রাচীন নিদর্শনের মধ্যে অন্যতম মূল্যবান হলো 2 মিলিয়ন ডলার মূল্যের 'অবলোকিতেশ্বর' ব্রোঞ্জ মূর্তি। মূর্তিটি 1939 সালে বিখ্যাত লক্ষণ মন্দিরের (Lakshmana Temple) কাছ থেকে আবিষ্কৃত ব্রোঞ্জের একটি বিশাল ভাণ্ডারের অংশ ছিল এবং 1952 সালের মধ্যে রায়পুরের মহন্ত ঘাসীদাস মেমোরিয়াল মিউজিয়ামের সংগ্রহশালায় স্থান পেয়েছিল, যেখান থেকে এটি পরবর্তীতে চুরি হয়।",
+    "question_en": "The United States returned 657 stolen antiquities worth $14 million to India, including a $2 million bronze figure of 'Avalokiteshvara'. What is the documented historical provenance of this specific statue?",
+    "options_en": [
+      "It was plundered from the Red Fort complex in Delhi in 2000 and smuggled out through maritime channels",
+      "It was discovered near the Lakshmana Temple in 1939 and had entered the collection of the Mahant Ghasidas Memorial Museum in Raipur by 1952",
+      "It was an ancient solid gold relic excavated from a shipwreck site off the coast of Kerala",
+      "It was a Mauryan era stone artifact held continuously under wraps by a private collector in California"
+    ],
+    "explanation_en": "The returned $2 million bronze masterpiece of 'Avalokiteshvara' seated on a lion-flanked throne was part of a large hoard of historic bronzes discovered near the Lakshmana Temple in 1939. The object was officially part of the Mahant Ghasidas Memorial Museum in Raipur by 1952 before being illicitly trafficked.",
+    "correctIndex": 1
+  },
+  {
+    "id": 24,
+    "question_bn": "ভারতের জাতীয় কোম্পানি আইন ট্রাইব্যুনাল (NCLT) এর নবনিযুক্ত সভাপতি বিচারপতি অনুপিন্দর সিং গ্রেওয়ালের পদের মেয়াদ এবং এই ট্রাইব্যুনাল গঠনের সঠিক তথ্য কোনটি?",
+    "options_bn": [
+      "তিনি 3 বছর মেয়াদে কাজ করবেন এবং এনসিএলটি 1990 সালে গঠিত একটি বিশুদ্ধ দেওয়ানি আদালত",
+      "তিনি 5 বছরের মেয়াদ বা 67 বছর বয়স (যা আগে হবে) পর্যন্ত কাজ করবেন এবং এনসিএলটি 1 জুন, 2016 সালে গঠিত একটি আধা-বিচারবিভাগীয় বা কোয়াসি-জুডিশিয়াল বডি",
+      "তাঁর পদের মেয়াদ আজীবন এবং এনসিএলটি-র প্রধান কার্যালয় মুম্বাইতে অবস্থিত",
+      "তিনি কেবল সর্বোচ্চ আদালতের বিচারপতিদের অবসরের পর 2 বছরের জন্য এই পদে নিযুক্ত হন"
+    ],
+    "explanation_bn": "কেন্দ্রীয় সরকার বিচারপতি অনুপিন্দর সিং গ্রেওয়ালকে ন্যাশনাল কোম্পানি ল ট্রাইব্যুনাল (NCLT) এর সভাপতি নিযুক্ত করেছে। তিনি 5 বছরের মেয়াদ অথবা তার বয়স 67 বছর পূর্ণ হওয়া পর্যন্ত (যেটি আগে আসে) এই পদে দায়িত্ব পালন করবেন। NCLT হলো 1 জুন, 2016 সালে গঠিত একটি আধা-বিচারবিভাগীয় সংস্থা (quasi-judicial body) যা ভারতীয় কোম্পানিগুলির বিরোধ নিষ্পত্তি করে এবং এর প্রধান বেঞ্চ নয়াদিল্লিতে অবস্থিত।",
+    "question_en": "What is the official tenure of Justice Anupinder Singh Grewal as the President of the National Company Law Tribunal (NCLT), and what is the nature of this institution?",
+    "options_en": [
+      "A fixed 3-year term, operating as a standard civil court established back in 1990",
+      "A 5-year term or until age 67, whichever is earlier; operating as a quasi-judicial body formed on 1 June 2016",
+      "A lifetime assignment operating out of the NCLT primary bench located in Mumbai",
+      "A temporary 2-year term reserved for retired judges who advise on criminal corporate fraud"
+    ],
+    "explanation_en": "The Union government appointed Anupinder Singh Grewal as President of the NCLT for a 5-year term or until he reaches the age of 67, whichever comes first. The NCLT is a quasi-judicial body in India tasked with adjudicating corporate issues, formally created on 1 June 2016 with its Principal Bench in New Delhi.",
+    "correctIndex": 1
+  },
+  {
+    "id": 25,
+    "question_bn": "ভারতীয় নৌবাহিনী সম্প্রতি মাজগাঁও ডক শিপবিল্ডার্স লিমিটেড (MDSL) থেকে 'INS Mahendragiri' নামক একটি স্টিলথ ফ্রigate গ্রহণ করেছে। এটি কোন প্রজেক্টের অধীনে নির্মিত কততম জাহাজ?",
+    "options_bn": [
+      "এটি প্রজেক্ট 15বি (Project 15B) এর অধীনে নির্মিত প্রথম যুদ্ধজাহাজ",
+      "এটি নীলগিরি-শ্রেণীর (প্রজেক্ট 17এ) ষষ্ঠ জাহাজ এবং এমডিএসএল-এ নির্মিত এই শ্রেণীর চতুর্থ জাহাজ",
+      "এটি প্রজেক্ট 75 (Project 75) এর অধীনে তৈরি সম্পূর্ণ দেশীয় প্রযুক্তির পারমাণবিক সাবমেরিন",
+      "এটি রাশিয়ার কারিগরি সহায়তায় নির্মিত প্রজেক্ট 1135.6 এর অষ্টম যুদ্ধজাহাজ"
+    ],
+    "explanation_bn": "আইএনএস মহেন্দ্রগিরি (Yard 12654) হলো নীলগিরি-শ্রেণীর বা প্রজেক্ট 17এ (Project 17A) স্টিলথ ফ্রিল্ড ক্রুজার সিরিজের ষষ্ঠ জাহাজ। এই জাহাজটি মুম্বাইয়ের মাজগাঁও ডক শিপবিল্ডার্স লিমিটেড (MDSL) দ্বারা নির্মিত হয়েছে এবং এটি এই নির্দিষ্ট শিপইয়ার্ডে তৈরি হওয়া এই শ্রেণীর চতুর্থ জাহাজ।",
+    "question_en": "The Indian Navy recently took delivery of the stealth frigate 'INS Mahendragiri' from Mazagon Dock Shipbuilders Limited (MDSL). What is its position and project classification?",
+    "options_en": [
+      "It is the first frontline guided missile destroyer built strictly under Project 15B",
+      "It is the sixth ship of the Nilgiri-class (Project 17A) and the fourth ship of this class built at MDSL",
+      "It is a nuclear-powered attack submarine designed under India's local Project 75 initiative",
+      "It is the eighth stealth cruiser inducted through technical collaboration with Russia under Project 1135.6"
+    ],
+    "explanation_en": "INS Mahendragiri (Yard 12654) is a stealth frigate delivered to the Indian Navy at Mumbai. The warship is officially classified as the sixth ship of the Nilgiri-class constructed under Project 17A, and specifically represents the fourth vessel of this class built locally by Mazagon Dock Shipbuilders Limited (MDSL).",
+    "correctIndex": 1
+  },
+  {
+    "id": 26,
+    "question_bn": "অক্সফোর্ড বিশ্ববিদ্যালয় এবং সিরাম ইনস্টিটিউট অফ ইন্ডিয়া (SII) দ্বারা যৌথভাবে তৈরি করা 'R78C' নামক নতুন ম্যালেরিয়া ভ্যাকসিনের মূল লক্ষ্য বা টার্গেট কোনটি?",
+    "options_bn": [
+      "এটি কেবল অ্যানোফিলিস মশার প্রজনন ক্ষমতা ধ্বংস করতে কাজ করে",
+      "এটি ম্যালেরিয়ার সবচেয়ে বিপজ্জনক পরজীবী 'প্লাজমোডিয়াম ফ্যালসিপেরাম' (Plasmodium falciparum)-কে লক্ষ্য করে তৈরি করা হয়েছে",
+      "এটি একটি সাধারণ অ্যান্টিবায়োটিক যা কেবল ডেঙ্গু জ্বর নিরাময়ে ব্যবহৃত হয়",
+      "এটি প্লাজমোডিয়াম ভাইভ্যাক্স নামক কম ক্ষতিকর পরজীবীকে প্রতিরোধ করার একমাত্র ওষুধ"
+    ],
+    "explanation_bn": "ইউনিভার্সিটি অফ অক্সফোর্ড এবং সিরাম ইনস্টিটিউট অফ ইন্ডিয়ার মধ্যে স্বাক্ষরিত চুক্তি অনুযায়ী, তারা 'R78C' নামক একটি নতুন ম্যালেরিয়া ভ্যাকসিন তৈরি ও উৎপাদন করছে। এই বিশেষ ভ্যাকসিনটি ম্যালেরিয়ার জন্য দায়ী সবচেয়ে মারাত্মক এবং বিপজ্জনক পরজীবী রূপ 'প্লাজমোডিয়াম ফ্যালসিপেরাম' (Plasmodium falciparum)-কে সরাসরি প্রতিহত করতে কাজ করে।",
+    "question_en": "The University of Oxford and Serum Institute of India (SII) signed an agreement for the new malaria vaccine 'R78C'. What is the biological target of this vaccine?",
+    "options_en": [
+      "It acts as a genetic modifier designed to disrupt the fertility of Anopheles mosquitoes",
+      "It targets Plasmodium falciparum, which is the most dangerous malaria parasite",
+      "It is a multi-valent drug engineered to cure severe post-infection Dengue shock syndrome",
+      "It focuses exclusively on the milder strain known as Plasmodium vivax to mitigate early symptoms"
+    ],
+    "explanation_en": "The licensing agreement between Oxford and the Serum Institute of India targets the manufacturing of the R78C malaria vaccine. This particular vaccine candidate is developed to target Plasmodium falciparum, globally recognized as the most dangerous and lethal malaria parasite strain.",
+    "correctIndex": 1
+  },
+  {
+    "id": 27,
+    "question_bn": "ভারত হেভি ইলেকট্রিক্যালস লিমিটেড (BHEL) সম্প্রতি ডিফেন্স রিসার্চ অ্যান্ড ডেভেলপমেন্ট অর্গানাইজেশন (DRDO)-এর অধীনে থাকা 'NSTL' ল্যাবের সাথে একটি লাইসেন্সিং চুক্তি (LATOT) স্বাক্ষর করেছে। এটি কোন প্রতিরক্ষামূলক ব্যবস্থার প্রযুক্তি হস্তান্তরের সাথে সম্পর্কিত?",
+    "options_bn": [
+      "যুদ্ধবিমানের জন্য তৈরি দূরপাল্লার এয়ার-টু-এয়ার মিসাইল সিস্টেম",
+      "নৌবাহিনীর যুদ্ধজাহাজে ব্যবহারের জন্য 'গ্যাস টারবাইন-ইনফ্রারেড সাপ্রেশন সিস্টেম' (Gas Turbine-Infrared Suppression System)",
+      "সাবমেরিনের সুরক্ষার জন্য সম্পূর্ণ দেশীয় সোনার (SONAR) নেটওয়ার্ক",
+      "স্থলবাহিনীর ট্যাংক প্রতিরোধী লেজার গাইডেড রকেট সিস্টেম"
+    ],
+    "explanation_bn": "রাষ্ট্রায়ত্ত সংস্থা বিএইচইএল (BHEL), ডিআরডিও-র বিশাখাপত্তনম স্থিত ল্যাব 'নেভাল সায়েন্স অ্যান্ড টেকনোলজিক্যাল ল্যাবরেটরি' (NSTL)-এর সাথে প্রযুক্তি হস্তান্তরের লাইসেন্সিং চুক্তি (LATOT) স্বাক্ষর করেছে। এর উদ্দেশ্য হলো নৌবাহিনীর যুদ্ধজাহাজ বা ভেসেলে শত্রুর ইনফ্রারেড বা তাপ-সন্ধানী ক্ষেপণাস্ত্রের আক্রমণ এড়াতে ব্যবহৃত অত্যন্ত গুরুত্বপূর্ণ 'গ্যাস টারবাইন-ইনফ্রারেড সাপ্রেশন সিস্টেম' এর দেশীয় উৎপাদন করা।",
+    "question_en": "Bharat Heavy Electricals Limited (BHEL) signed a Licensing Agreement for Transfer of Technology (LATOT) with DRDO-NSTL. What technology does this pact cover?",
+    "options_en": [
+      "Long-range air-to-air radar guided interception systems built for fighter jets",
+      "The Gas Turbine-Infrared Suppression System used in naval vessels",
+      "Fully integrated active sonar array suites mapped out for nuclear submarines",
+      "Anti-tank laser-guided anti-armor defense systems meant for infantry formations"
+    ],
+    "explanation_en": "BHEL entered into a formal LATOT agreement with the Naval Science and Technological Laboratory (NSTL), a premier research facility under the Defence Research and Development Organisation (DRDO). The technology transfer is explicitly for manufacturing the Gas Turbine-Infrared Suppression System used to shield naval ships.",
+    "correctIndex": 1
+  },
+  {
+    "id": 28,
+    "question_bn": "সম্প্রতি উড়িষ্যা বা ঝাড়খণ্ডের সাত বছর বয়সী শিশু 'ইশান সিং' (Ishank Singh) তৈরাকী ইতিহাসের কোন অনন্য কীর্তি গড়েছে এবং সেটির ভৌগোলিক সীমানা কত দূর বিস্তৃত ছিল?\n(A) সে ভারত মহাসাগরের 50 কিলোমিটার পথ মাত্র 5 ঘণ্টায় পাড়ি দিয়েছে\n(B) সে শ্রীলঙ্কা ও ভারতের মধ্যবর্তী 'পাক জলডমারুমধ্য' (Palk Strait) পার হওয়া সর্বকনিষ্ঠ সাঁতারু হয়েছে, যার দূরত্ব ছিল তলাইমন্নার থেকে ধনুশকোডি পর্যন্ত 29 কিলোমিটার\n(C) সে আরব সাগরের মুম্বাই উপকূল থেকে গোয়া পর্যন্ত একটানা সাঁতার কেটেছে\n(D) সে কেবল স্থানীয় একটি হ্রদে সবচেয়ে বেশি সময় ভেসে থাকার বিশ্ব রেকর্ড গড়েছে",
+    "options_bn": [
+      "সে ভারত মহাসাগরের 50 কিলোমিটার পথ মাত্র 5 ঘণ্টায় পাড়ি দিয়েছে",
+      "সে শ্রীলঙ্কা ও ভারতের মধ্যবর্তী 'পাক জলডমারুমধ্য' (Palk Strait) পার হওয়া সর্বকনিষ্ঠ সাঁতারু হয়েছে, যার দূরত্ব ছিল তলাইমন্নার থেকে ধনুশকোডি পর্যন্ত 29 কিলোমিটার",
+      "সে আরব সাগরের মুম্বাই উপকূল থেকে গোয়া পর্যন্ত একটানা সাঁতার কেটেছে",
+      "সে কেবল স্থানীয় একটি হ্রদে সবচেয়ে বেশি সময় ভেসে থাকার বিশ্ব রেকর্ড গড়েছে"
+    ],
+    "explanation_bn": "ঝাড়খণ্ডের মাত্র সাত বছর বয়সী ছেলে ঈশান সিং \"মিশন সমন্দর\" এর অংশ হিসেবে শ্রীলঙ্কা এবং ভারতের মধ্যবর্তী 'পাক জলডমারুমধ্য' (Palk Strait) সফলভাবে অতিক্রমকারী বিশ্বের সর্বকনিষ্ঠ সাঁতারু হয়ে ইতিহাস তৈরি করেছে। সে শ্রীলঙ্কার তলাইমন্নার থেকে তামিলনাড়ুর ধনুশকোডি পর্যন্ত বিস্তৃত 29 কিলোমিটার দীর্ঘ সমুদ্রপথ মাত্র 9 ঘণ্টা 50 মিনিটে পাড়ি দেয়, যা ইউনিভার্সাল রেকর্ডস ফোরাম দ্বারা স্বীকৃত হয়েছে।",
+    "question_en": "Seven-year-old Ishank Singh created sporting history by becoming the youngest swimmer to cross the Palk Strait. What was the exact geographical route and length of this swim?",
+    "options_en": [
+      "A 50-km open ocean stretch crossing the main channel of the Indian Ocean in under 5 hours",
+      "A 29-km stretch from Talaimannar (Sri Lanka) to Dhanushkodi (Tamil Nadu) completed in 9 hours 50 minutes",
+      "An endurance coastal run stretching continuously from the Mumbai harbor down to the Goa coast",
+      "A continuous timed stationary float record executed in a high-altitude freshwater lake"
+    ],
+    "explanation_en": "Under the banner of \"Mission Samandar\", seven-year-old Ishank Singh from Jharkhand became the youngest swimmer to successfully cross the Palk Strait between Sri Lanka and India. He completed the 29-km oceanic distance from Talaimannar (Sri Lanka) to Dhanushkodi (Tamil Nadu) in 9 hours 50 minutes.",
+    "correctIndex": 1
+  },
+  {
+    "id": 29,
+    "question_bn": "কেন্দ্রীয় তথ্য ও সম্প্রচার মন্ত্রক সম্প্রতি ভারতের পাবলিক সার্ভিস ব্রডকাস্টার 'প্রসার ভারতী' (Prasar Bharati)-এর নতুন চেয়ারম্যান হিসেবে কাকে নিযুক্ত করেছে এবং প্রসার ভারতী কোন সালে গঠিত হয়েছিল?",
+    "options_bn": [
+      "অমিতাভ বচ্চনকে চেয়ারম্যান করা হয়েছে এবং এটি 1950 সালে গঠিত হয়",
+      "বিখ্যাত গীতিকার ও লেখক প্রসূন জোশীকে নিযুক্ত করা হয়েছে এবং প্রসার ভারতী 23 নভেম্বর, 1997 সালে গঠিত হয়",
+      "করণ জোহরকে নিযুক্ত করা হয়েছে এবং এটি 2005 সালের একটি সংবিধিবদ্ধ সংস্থা",
+      "পিযূষ পান্ডেকে নিযুক্ত করা হয়েছে এবং এর মূল কার্যালয় মুম্বাইতে অবস্থিত"
+    ],
+    "explanation_bn": "তথ্য ও সম্প্রচার মন্ত্রক প্রখ্যাত গীতিকার, লেখক এবং বিশিষ্ট যোগাযোগ বিশেষজ্ঞ প্রসূন জোশীকে প্রসার ভারতীর (Prasar Bharati) নতুন চেয়ারম্যান নিযুক্ত করেছে। তিনি এর আগে সিবিএফসি (CBFC)-র চেয়ারম্যান ছিলেন। ভারতের এই স্বায়ত্তশাসিত পাবলিক সার্ভিস ব্রডকাস্টার প্রতিষ্ঠানটি 23 নভেম্বর, 1997 সালে গঠিত হয়েছিল এবং এর সদর দফতর নয়াদিল্লিতে অবস্থিত।",
+    "question_en": "Noted writer and communication expert Prasoon Joshi has been appointed as the Chairman of Prasar Bharati. When was this public service broadcasting institution formed?",
+    "options_en": [
+      "It was set up shortly after independence in 1950 via an executive order",
+      "It was formed on 23 November 1997 under the Ministry of Information and Broadcasting",
+      "It was legislated into existence as a statutory regulator in 2005 based in Mumbai",
+      "It was converted from an attached office into an autonomous board in January 2015"
+    ],
+    "explanation_en": "The Ministry of Information and Broadcasting appointed lyricist and writer Prasoon Joshi as the new Chairman of Prasar Bharati, India's public service broadcaster. Prasar Bharati was formally established into existence on 23 November 1997 and functions with its headquarters in New Delhi.",
+    "correctIndex": 1
+  },
+  {
+    "id": 30,
+    "question_bn": "ভারতের প্রধানমন্ত্রী কর্তৃক সম্প্রতি অনুমোদিত নীতি আয়োগ (NITI Aayog)-এর নতুন পূর্ণকালিন সদস্য জোরাম অনিয়া (Joram Aniya)-র নিয়োগটি কেন একটি ঐতিহাসিক সামাজিক ও আঞ্চলিক মাইলফলক?",
+    "options_bn": [
+      "তিনি নীতি আয়োগের প্রথম মহিলা ভাইস-চেয়ারম্যান হিসেবে দায়িত্ব গ্রহণ করেছেন",
+      "তিনি অরুণাচল প্রদেশের 'ন্যাশী' (Nyishi) সম্প্রদায়ের প্রথম মহিলা যিনি পিএইচডি ডিগ্রি অর্জন করেছেন এবং রাজ্যে হিন্দিতে প্রথম ডক্টরেট প্রাপ্ত ব্যক্তি",
+      "তিনি ভারতের উত্তর-পূর্বাঞ্চল থেকে নির্বাচিত একমাত্র কেন্দ্রীয় ক্যাবিনেট সচিব",
+      "তিনি নীতি আয়োগে যোগ দেওয়া ভারতের কনিষ্ঠতম আইএএস (IAS) অফিসার"
+    ],
+    "explanation_bn": "প্রধানমন্ত্রী নরেন্দ্র মোদী আর. বালাসুব্রমণিয়ম এবং জোরম অনিয়া-কে নীতি আয়োগের পূর্ণকালীন সদস্য (Full-time Members) হিসেবে নিয়োগের অনুমোদন দিয়েছেন। জোরম অনিয়া-র এই ভুক্তিটি অত্যন্ত ঐতিহাসিক ও অনন্য কারণ তিনি অরুণাচল প্রদেশের 'ন্যাশী' (Nyishi) উপজাতি বা সম্প্রদায়ের প্রথম মহিলা যিনি পিএইচডি (PhD) ডিগ্রি লাভ করেছেন এবং সমগ্র অরুণাচল রাজ্যে হিন্দিতে ডক্টরেট ডিগ্রি অর্জনকারী প্রথম ব্যক্তিত্ব।",
+    "question_en": "Prime Minister Narendra Modi approved the appointment of Joram Aniya as a full-time member of NITI Aayog. Why is her appointment considered historically significant for Northeast India?",
+    "options_en": [
+      "She steps into the apex policy office as the first woman Vice-Chairperson of NITI Aayog",
+      "She is the first woman from the Nyishi community to earn a PhD and the first doctorate in Hindi in Arunachal Pradesh",
+      "She represents the first Indian Administrative Service (IAS) topper ever picked from the border districts",
+      "She is the youngest postgraduate ever nominated directly into India's premier think tank"
+    ],
+    "explanation_en": "Prime Minister Narendra Modi approved Joram Aniya alongside R. Balasubramaniam as full-time members of NITI Aayog. Her appointment is historic because she is the first woman hailing from the Nyishi community to achieve a PhD, and holds the distinction of being the first doctorate recipient in Hindi in the state of Arunachal Pradesh.",
+    "correctIndex": 1
+  }
+];
+
+// PERSISTENCE KEYS
+const SESSION_KEY = 'quiz_session_v1_dl';
+const TIMER_KEY = 'quiz_end_time_dl';
+const ANSWERS_KEY = 'quiz_answers_dl';
+
+// =========================================
+// 2. PARSER SERVICE (No longer explicitly needed if pre-parsed, but kept for fallback)
+// =========================================
+const parseQuizText = (text) => {
+  if (!text) return [];
+  const normalizedText = text.replace(/\r\n/g, '\n');
+  const blocks = normalizedText.split(/\n(?=Q?\d+\.)/);
+  
+  const parsedQuestions = [];
+
+  blocks.forEach((block, index) => {
+    if (!block.trim()) return;
+
+    // Detect format
+    const isNewFormat = block.includes("Options (choose one):");
+
+    let qEn = "Question missing";
+    let optsEn = [];
+    let correctIndex = 0;
+    let expEn = "";
+
+    if (isNewFormat) {
+        // NEW PARAJUMBLE FORMAT
+        const qMatch = block.match(/(?:Q?\d+\.\s*)?([\s\S]*?)(?=\nOptions \(choose one\):)/i);
+        qEn = qMatch ? qMatch[1].trim() : "Question text missing";
+  
+        const optSectionMatch = block.match(/Options \(choose one\):\s*([\s\S]*?)(?=\nCorrect option:)/i);
+        if (optSectionMatch) {
+          optsEn = optSectionMatch[1]
+            .split('\n')
+            .map(l => l.trim())
+            .filter(l => l.length > 0)
+            .map(line => line.replace(/^([A-Za-z0-9]+)[\.\)]\s*/, ''));
+        }
+  
+        const ansMatch = block.match(/Correct option:\s*(.*?)(?=\nExplanation:|$)/i);
+        const correctValue = ansMatch ? ansMatch[1].trim() : "";
+        
+        correctIndex = optsEn.findIndex(opt => opt.replace(/\s/g, '') === correctValue.replace(/\s/g, ''));
+        if (correctIndex === -1) correctIndex = 0;
+  
+        const expMatch = block.match(/Explanation:\s*([\s\S]*?)(?=$)/i);
+        expEn = expMatch ? expMatch[1].trim() : "";
+      
+        parsedQuestions.push({
+          id: index + 1,
+          question_bn: "",
+          options_bn: optsEn,
+          explanation_bn: "",
+          question_en: qEn,
+          options_en: optsEn,
+          explanation_en: expEn,
+          correctIndex: correctIndex >= 0 ? correctIndex : 0
+        });
+  
+    } else {
+      // OLD FORMAT FALLBACK
+      const bnSectionMatch = block.match(/প্রশ্ন:\s*([\s\S]*?)(?=\nQuestion:|$)/);
+      const bnSection = bnSectionMatch ? bnSectionMatch[0] : '';
+      
+      const enSectionMatch = block.match(/Question:\s*([\s\S]*?)(?=\nAnswer:|$)/);
+      const enSection = enSectionMatch ? enSectionMatch[0] : '';
+
+      const qBn = bnSection.match(/প্রশ্ন:\s*([\s\S]*?)(?=\n\(A\))/)?.[1]?.trim() || "";
+      let qEn = enSection.match(/Question:\s*([\s\S]*?)(?=\n\(A\))/)?.[1]?.trim() || "";
+      
+      if (!qEn && !qBn) {
+          const genericQMatch = block.match(/(?:Q?\d+\.\s*)?([\s\S]*?)(?=\n\(A\))/);
+          qEn = genericQMatch ? genericQMatch[1].trim() : "Question missing";
+      }
+
+      const cleanSection = (txt) => {
+         return txt.replace(/\n(?:Answer|উত্তর|Correct option|Explanation|ব্যাখ্যা):[\s\S]*$/i, '');
+      };
+
+      const extractOptions = (section) => {
+          const matches = [...section.matchAll(/\([A-D]\)\s*(.*?)(?=\n\(|\nউত্তর:|\nQuestion:|\nAnswer:|\nCorrect|\nব্যাখ্যা:|$)/g)];
+          return matches.map(m => m[1].trim());
+      };
+
+      const optsBn = extractOptions(cleanSection(bnSection));
+      let optsEn = extractOptions(cleanSection(enSection));
+
+      if (optsEn.length === 0 && !bnSection) {
+          optsEn = extractOptions(cleanSection(block));
+      }
+
+      const ansMatch = block.match(/(?:Answer|উত্তর|Correct option):\s*(?:\()([A-D])(?:\))/i);
+      const ansChar = ansMatch ? ansMatch[1] : 'A';
+      correctIndex = ansChar.toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+
+      const expBnMatch = block.match(/(?:ব্যাখ্যা):\s*([\s\S]*?)(?=\nQuestion:|$)/i);
+      const expEnMatch = block.match(/(?:Explanation):\s*([\s\S]*?)(?=$)/i);
+      
+      const expBn = expBnMatch ? expBnMatch[1].trim() : "";
+      const expEn = expEnMatch ? expEnMatch[1].trim() : "";
+
+      parsedQuestions.push({
+        id: index + 1,
+        question_bn: qBn,
+        options_bn: optsBn,
+        explanation_bn: expBn,
+        question_en: qEn,
+        options_en: optsEn,
+        explanation_en: expEn,
+        correctIndex: correctIndex >= 0 ? correctIndex : 0
+      });
+    }
+  });
+
+  return parsedQuestions;
+};
+
+// =========================================
+// 3. API SERVICE
+// =========================================
+const submitScoreToSheet = async (name, score, total) => {
+  if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes("PASTE_YOUR")) {
+    console.warn("Google Script URL not configured.");
+    return false;
+  }
+  const percentage = ((score / total) * 100).toFixed(2);
+  const timestamp = new Date().toLocaleString();
+  const payload = { time: timestamp, name: name, score: score.toFixed(2), total: total, percentage: percentage };
+  try {
+    await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    return true;
+  } catch (error) {
+    console.error("Failed to submit score", error);
+    return false;
+  }
+};
+
+// =========================================
+// 4. COMPONENTS
+// =========================================
+const { useState, useEffect, useMemo, useRef } = React;
+
+const Quiz = ({ questions, config, initialLang, onComplete }) => {
+  const [lang, setLang] = useState(initialLang);
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  // Initialize Answers from LocalStorage
+  const [userAnswers, setUserAnswers] = useState(() => {
+      try {
+        const saved = localStorage.getItem(ANSWERS_KEY);
+        return saved ? JSON.parse(saved) : {};
+      } catch (e) { return {}; }
+  });
+  
+  const answersRef = useRef(userAnswers);
+  useEffect(() => {
+      answersRef.current = userAnswers;
+  }, [userAnswers]);
+
+  useEffect(() => {
+    let targetTime;
+    const storedEndTime = localStorage.getItem(TIMER_KEY);
+
+    if (storedEndTime) {
+      targetTime = parseInt(storedEndTime, 10);
+    } else {
+      targetTime = Date.now() + config.totalTime * 1000;
+      localStorage.setItem(TIMER_KEY, targetTime.toString());
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const secondsLeft = Math.max(0, Math.floor((targetTime - now) / 1000));
+      setTimeLeft(secondsLeft);
+      if (secondsLeft <= 0) return true; 
+      return false; 
+    };
+
+    const autoSubmit = () => {
+       onComplete(answersRef.current);
+    };
+
+    if (updateTimer()) {
+        autoSubmit();
+        return;
+    }
+
+    const timer = setInterval(() => {
+      if (updateTimer()) {
+        clearInterval(timer);
+        autoSubmit();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(ANSWERS_KEY, JSON.stringify(userAnswers));
+  }, [userAnswers]);
+
+  const toggleOption = (qIndex, optIndex) => {
+    setUserAnswers((prev) => {
+      const current = prev[qIndex];
+      const newState = { ...prev };
+      if (current === optIndex) {
+        delete newState[qIndex];
+      } else {
+        newState[qIndex] = optIndex;
+      }
+      return newState;
+    });
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className="main-wrapper screen active" style={{ display: 'flex' }}>
+      <div className="sticky-header">
+        <div className="timer-box">
+          ⏱ {formatTime(timeLeft)}
+        </div>
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value)}
+          style={{ padding: '5px', fontSize: '1rem' }}
+        >
+          <option value="en">English</option>
+          <option value="bn">বাংলা</option>
+        </select>
+      </div>
+
+      <div style={{ padding: '0 20px', flex: 1 }}>
+        {questions.map((q, idx) => {
+          const qText = (lang === 'bn' && q.question_bn) ? q.question_bn : q.question_en;
+          const options = (lang === 'bn' && q.options_bn && q.options_bn.length) ? q.options_bn : q.options_en;
+          const selected = userAnswers[idx];
+
+          return (
+            <div key={q.id} className="question-container">
+              <div className="question-text">Q{idx + 1}. {qText}</div>
+              <div className="options-grid">
+                {options && options.map((opt, optIdx) => (
+                  <div
+                    key={optIdx}
+                    onClick={() => toggleOption(idx, optIdx)}
+                    className={`option ${selected === optIdx ? 'selected' : ''}`}
+                  >
+                    <span style={{ fontWeight: 'bold', marginRight: '8px' }}>
+                      {String.fromCharCode(65 + optIdx)}.
+                    </span>
+                    {opt}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ padding: '20px', background: 'white', borderTop: '1px solid #ddd' }}>
+        <button onClick={() => onComplete(userAnswers)}>
+          Submit Exam
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const Result = ({ questions, userAnswers, config, studentName, initialLang, onRetake }) => {
+  const [submissionStatus, setSubmissionStatus] = useState("Sending data...");
+  const [score, setScore] = useState(0);
+  const [lang, setLang] = useState(initialLang);
+
+  const totalPossible = questions.length * config.marksCorrect;
+
+  useEffect(() => {
+    let calculatedScore = 0;
+    questions.forEach((q, idx) => {
+      const userChoice = userAnswers[idx];
+      if (userChoice !== undefined) {
+        if (userChoice === q.correctIndex) {
+          calculatedScore += config.marksCorrect;
+        } else {
+          calculatedScore += config.marksWrong;
+        }
+      }
+    });
+    setScore(calculatedScore);
+
+    submitScoreToSheet(studentName, calculatedScore, totalPossible).then((success) => {
+      setSubmissionStatus(success ? "✅ Score saved successfully!" : "⚠️ Saved locally (Connection failed)");
+    });
+  }, []);
+
+  return (
+    <div className="main-wrapper screen active">
+      <div className="card">
+        <h2>Result Summary</h2>
+        <div style={{ fontSize: '2rem', color: 'var(--accent-color)', fontWeight: 'bold' }}>
+          {score.toFixed(1)} <span style={{ fontSize: '1rem', color: '#666' }}>/ {totalPossible}</span>
+        </div>
+        <p>Student: <strong>{studentName}</strong></p>
+        <p style={{ color: submissionStatus.includes('✅') ? 'green' : 'orange', fontWeight: 'bold' }}>
+          {submissionStatus}
+        </p>
+        <button onClick={onRetake} style={{ marginTop: '20px' }}>Take Quiz Again</button>
+      </div>
+
+      <div style={{ padding: '20px' }}>
+        <h3>Detailed Review</h3>
+        <div style={{marginBottom: '10px'}}>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              style={{ padding: '5px' }}
+            >
+              <option value="en">English</option>
+              <option value="bn">বাংলা</option>
+            </select>
+        </div>
+        {questions.map((q, idx) => {
+           const qText = (lang === 'bn' && q.question_bn) ? q.question_bn : q.question_en;
+           const options = (lang === 'bn' && q.options_bn && q.options_bn.length) ? q.options_bn : q.options_en;
+           const exp = (lang === 'bn' && q.explanation_bn) ? q.explanation_bn : q.explanation_en;
+
+           const userChoice = userAnswers[idx];
+           const isAttempted = userChoice !== undefined;
+           const isCorrect = isAttempted && userChoice === q.correctIndex;
+
+           let statusClass = "status-unanswered";
+           let statusText = "Skipped";
+
+           if (isAttempted) {
+             if (isCorrect) {
+               statusClass = "status-correct";
+               statusText = `Correct (+${config.marksCorrect})`;
+             } else {
+               statusClass = "status-wrong";
+               statusText = `Wrong (${config.marksWrong})`;
+             }
+           }
+
+           return (
+             <div key={q.id} className="review-item">
+               <p style={{whiteSpace: 'pre-wrap'}}><strong>Q{idx+1}:</strong> {qText}</p>
+               <p className={statusClass}>Status: {statusText}</p>
+               <p>Correct: <strong>{options && options[q.correctIndex]}</strong></p>
+               {isAttempted && <p>You Selected: {options && options[userChoice]}</p>}
+               <div className="explanation">
+                 <strong>Explanation:</strong> {exp || "N/A"}
+               </div>
+             </div>
+           );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- APP COMPONENT ---
+const App = () => {
+  const session = useMemo(() => {
+    try {
+      const s = localStorage.getItem(SESSION_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch(e) { return null; }
+  }, []);
+
+  const [screen, setScreen] = useState(session && session.isActive ? 'QUIZ' : 'LANDING'); 
+  const [name, setName] = useState(session ? session.name : '');
+  const [lang, setLang] = useState(DEFAULT_LANGUAGE);
+  const [userAnswers, setUserAnswers] = useState({});
+
+  useEffect(() => {
+    if (screen === 'QUIZ') {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ isActive: true, name: name }));
+    }
+  }, [screen, name]);
+
+  const questions = useMemo(() => {
+    const all = window.__PREPARSED_JSON__ && window.__PREPARSED_JSON__.length > 0 
+      ? window.__PREPARSED_JSON__ 
+      : parseQuizText(DEFAULT_RAW_TEXT);
+      
+    if (!all || all.length === 0) {
+        return [{
+            id: 1, question_bn: "No questions provided.", options_bn: ["A", "B", "C", "D"],
+            explanation_bn: "", question_en: "No questions provided.", options_en: ["A", "B", "C", "D"],
+            explanation_en: "", correctIndex: 0
+        }];
+    }
+    return (DEFAULT_CONFIG.maxQuestions && DEFAULT_CONFIG.maxQuestions > 0) 
+      ? all.slice(0, DEFAULT_CONFIG.maxQuestions) 
+      : all;
+  }, []);
+
+  const handleStart = () => {
+    if (!name.trim()) {
+      alert("Please enter your Name.");
+      return;
+    }
+    // Clear any stale timer/answer data from a previous crashed session
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem(ANSWERS_KEY);
+    setScreen('QUIZ');
+  };
+
+  const handleComplete = (answers) => {
+     localStorage.removeItem(SESSION_KEY);
+     localStorage.removeItem(TIMER_KEY);
+     localStorage.removeItem(ANSWERS_KEY);
+     setUserAnswers(answers);
+     setScreen('RESULT');
+  };
+
+  const handleRetake = () => {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(TIMER_KEY);
+    localStorage.removeItem(ANSWERS_KEY);
+    setUserAnswers({});
+    setScreen('LANDING');
+  };
+
+  return (
+    <div className="main-wrapper" style={{ minHeight: '100vh', justifyContent: screen === 'LANDING' ? 'center' : 'flex-start' }}>
+      {screen === 'LANDING' && (
+        <div className="card" style={{ maxWidth: '400px', margin: '0 auto' }}>
+          <h1>{APP_TITLE}</h1>
+          <p className="subtitle">{APP_SUBTITLE}</p>
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Student Name</label>
+            <input 
+              type="text" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your full name"
+              style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+            />
+          </div>
+          
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+             <label style={{ display: 'block', marginBottom: '5px' }}>Language</label>
+             <select 
+               value={lang} 
+               onChange={(e) => setLang(e.target.value)}
+               style={{ width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' }}
+             >
+                <option value="en">English</option>
+                <option value="bn">বাংলা</option>
+             </select>
+          </div>
+
+          <button onClick={handleStart}>Start Quiz</button>
+        </div>
+      )}
+      {screen === 'QUIZ' && (
+        <Quiz 
+          questions={questions}
+          config={DEFAULT_CONFIG}
+          initialLang={lang}
+          onComplete={handleComplete}
+        />
+      )}
+      {screen === 'RESULT' && (
+        <Result 
+          questions={questions}
+          userAnswers={userAnswers}
+          config={DEFAULT_CONFIG}
+          studentName={name}
+          initialLang={lang}
+          onRetake={handleRetake}
+        />
+      )}
+    </div>
+  );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+
+  </script>
+</body>
+</html>
